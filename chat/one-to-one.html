@@ -15,14 +15,15 @@
       background: #0f172a;
       color: #f8fafc;
       font-family: 'Inter', sans-serif;
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
     }
     .navbar { background: rgba(0,0,0,0.9); }
 
-    /* Hidden until auth */
-    .chat-container { display: none; height: calc(100vh - 56px); display: flex; }
-
+    .chat-container {
+      display: none;
+      height: calc(100vh - 56px);
+      display: flex;
+    }
     .sidebar {
       width: 280px;
       background: #1e293b;
@@ -39,20 +40,13 @@
       margin-bottom: 0.5rem;
     }
     .suggestions {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      max-height: 150px;
-      overflow-y: auto;
+      list-style: none; padding: 0; margin: 0;
+      max-height: 150px; overflow-y: auto;
     }
     .suggestions li {
-      padding: 0.4rem 0.6rem;
-      cursor: pointer;
-      color: #f8fafc;
+      padding: 0.4rem 0.6rem; cursor: pointer; color: #f8fafc;
     }
-    .suggestions li:hover {
-      background: #475569;
-    }
+    .suggestions li:hover { background: #475569; }
     .user-item {
       position: relative;
       padding: 0.5rem 0.75rem;
@@ -62,66 +56,43 @@
     .user-item.active { background: #475569; }
     .user-item:hover { background: #334155; }
     .new-badge {
-      position: absolute;
-      top: 50%;
-      right: 1rem;
+      position: absolute; top: 50%; right: 1rem;
       transform: translateY(-50%);
-      font-size: 0.8rem;
-      color: #fde047;
+      font-size: 0.8rem; color: #fde047;
     }
 
     .chat-main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
+      flex: 1; display: flex; flex-direction: column;
       background: #111827;
     }
     .message-box {
-      flex: 1;
-      padding: 1rem;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
+      flex: 1; padding: 1rem; overflow-y: auto;
+      display: flex; flex-direction: column;
     }
     .message {
-      padding: 0.6rem 1rem;
-      margin-bottom: 10px;
-      border-radius: 10px;
-      max-width: 70%;
-      word-wrap: break-word;
-      font-size: 0.95rem;
+      padding: 0.6rem 1rem; margin-bottom: 10px;
+      border-radius: 10px; max-width: 70%;
+      word-wrap: break-word; font-size: 0.95rem;
     }
     .sent {
-      background-color: #2563eb;
-      align-self: flex-end;
+      background-color: #2563eb; align-self: flex-end;
       color: #fff;
     }
     .received {
-      background-color: #374151;
-      align-self: flex-start;
+      background-color: #374151; align-self: flex-start;
       color: #fff;
     }
     .input-area {
-      display: flex;
-      padding: 0.75rem;
-      background: #1f2937;
+      display: flex; padding: 0.75rem; background: #1f2937;
     }
     .input-area input {
-      flex: 1;
-      padding: 0.5rem;
-      margin-right: 0.5rem;
-      border-radius: 8px;
-      border: none;
-      background: #374151;
-      color: #fff;
+      flex: 1; padding: 0.5rem; margin-right: 0.5rem;
+      border-radius: 8px; border: none;
+      background: #374151; color: #fff;
     }
     .input-area button {
-      background: #facc15;
-      color: #000;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
-      font-weight: bold;
+      background: #facc15; color: #000; border: none;
+      padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold;
     }
     .input-area button:hover { background: #fde047; }
   </style>
@@ -134,11 +105,7 @@
       <a class="navbar-brand text-warning" href="index.html">
         <i class="fas fa-user-graduate me-2"></i>CampusVerse
       </a>
-      <button 
-        class="navbar-toggler" 
-        type="button" 
-        data-bs-toggle="collapse" 
-        data-bs-target="#mainNav">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse justify-content-end" id="mainNav">
@@ -167,88 +134,71 @@
     </div>
   </div>
 
+  <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Chat Logic -->
   <script>
     const API = "https://campusverse-backend.onrender.com/api"
     let username, contacts = [], selectedUser = null
     let isTyping = false, poll
 
-    // 1) Auth + Navbar
-    async function init() {
+    // 1) Navbar + Auth
+    async function injectNavbar() {
       try {
-        const res = await fetch(`${API}/auth/user`, { credentials:'include' })
-        if (!res.ok) throw 0
-        const user = await res.json()
-        username = user.username
-
-        document.getElementById("nav-user-area").innerHTML = `
+        const r = await fetch(\`\${API}/auth/user\`, { credentials:'include' })
+        if (!r.ok) throw 0
+        const u = await r.json()
+        username = u.username
+        document.getElementById("nav-user-area").innerHTML = \`
           <li class="nav-item">
-            <a class="nav-link" href="profile.html">👤 ${username}</a>
+            <a class="nav-link" href="profile.html">👤 \${username}</a>
           </li>
           <li class="nav-item">
             <a class="nav-link text-danger" href="#" onclick="logout()">Logout</a>
-          </li>`
-
+          </li>\`
         document.getElementById("chatContainer").style.display = "flex"
-        await loadContacts()
-        startPolling()
       } catch {
         window.location.href = "login.html"
       }
     }
 
     function logout() {
-      fetch(`${API}/auth/logout`, { credentials:'include' })
+      fetch(\`\${API}/auth/logout\`, { credentials:'include' })
         .then(() => window.location.href = "login.html")
     }
 
-    // 2) Load contacts & init unread/count
+    // 2) Load + render contacts
     async function loadContacts() {
       try {
-        const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials:'include' })
-        contacts = await res.json()
+        const r = await fetch(\`\${API}/chat/one-to-one/contacts\`, { credentials:'include' })
+        contacts = await r.json()
       } catch {
         contacts = []
       }
-
-      // For each, fetch initial message count
-      for (let c of contacts) {
-        const keyCount = `chatCount_${username}_${c.username}`
-        let old = parseInt(localStorage.getItem(keyCount) || "0", 10)
-        try {
-          const r = await fetch(`${API}/chat/one-to-one/${c.username}`, { credentials:'include' })
-          const msgs = await r.json()
-          localStorage.setItem(keyCount, msgs.length)
-        } catch { /* ignore */ }
-        // reset unread flag
-        localStorage.setItem(`newchat_${username}_${c.username}`, "0")
-      }
-
       renderContacts()
     }
 
     function renderContacts() {
       const list = document.getElementById("contactList")
       list.innerHTML = ""
-      contacts.forEach(u => {
+      contacts.forEach(c => {
         const div = document.createElement("div")
-        div.className = "user-item" + (u.username === selectedUser ? " active" : "")
-        div.textContent = u.username
-
-        // badge if unread
-        if (localStorage.getItem(`newchat_${username}_${u.username}`) === "1") {
+        div.className = "user-item" + (c.username === selectedUser ? " active" : "")
+        div.textContent = c.username
+        // new message badge
+        if (localStorage.getItem(`newchat_\${username}_\${c.username}`) === "1") {
           const span = document.createElement("span")
           span.className = "new-badge"
           span.innerText = "🆕"
           div.appendChild(span)
         }
-
-        div.onclick = () => selectUser(u.username)
+        div.onclick = () => selectUser(c.username)
         list.appendChild(div)
       })
     }
 
-    // 3) Suggest users
+    // 3) Search suggestions
     let searchTimer
     document.getElementById("userSearch").addEventListener("input", () => {
       clearTimeout(searchTimer)
@@ -262,8 +212,11 @@
       if (!q) return
 
       try {
-        const res = await fetch(`${API}/users?search=${encodeURIComponent(q)}`, { credentials:'include' })
-        const list = await res.json()
+        const r = await fetch(\`\${API}/users?search=\${encodeURIComponent(q)}\`, {
+          credentials:'include'
+        })
+        if (!r.ok) throw 0
+        const list = await r.json()
         list
           .filter(u => u.username !== username && !contacts.find(c=>c.username===u.username))
           .slice(0,5)
@@ -280,99 +233,83 @@
             ul.appendChild(li)
           })
       } catch {
-        /* ignore */
+        // ignore
       }
     }
 
-    // 4) Select a contact
-    function selectUser(user) {
-      selectedUser = user
-      // clear unread
-      localStorage.setItem(`newchat_${username}_${user}`, "0")
+    // 4) Select & poll
+    function selectUser(name) {
+      selectedUser = name
+      localStorage.setItem(`newchat_\${username}_\${name}`, "0")
       renderContacts()
-
-      // reset messages area
       document.getElementById("chatMessages").innerHTML = ""
-      // reset stored count so new messages will show correctly
-      const keyCount = `chatCount_${username}_${user}`
-      localStorage.setItem(keyCount, "0")
-      fetchAndRender()
+      clearInterval(poll)
+      startPolling()
     }
 
-    // 5) Polling loop
     function startPolling() {
       clearInterval(poll)
-      poll = setInterval(() => {
-        fetchAndRender()
-        checkUnread()
-      }, 1000)
+      poll = setInterval(fetchAndRender, 1000)
       fetchAndRender()
-      checkUnread()
     }
 
-    // 6) Fetch selected chat messages
+    // 5) Fetch + render convo
     async function fetchAndRender() {
       if (!selectedUser || isTyping) return
       try {
-        const res = await fetch(`${API}/chat/one-to-one/${selectedUser}`, { credentials:'include' })
-        if (!res.ok) throw 0
-        const msgs = await res.json()
+        const r = await fetch(\`\${API}/chat/one-to-one/\${encodeURIComponent(selectedUser)}\`, {
+          credentials:'include'
+        })
+        if (!r.ok) return
+        const msgs = await r.json()
         const box = document.getElementById("chatMessages")
-        box.innerHTML = msgs.map(m => `
-          <div class="message ${m.sender.username === username ? "sent" : "received"}">
-            ${m.text}
-            <div class="meta text-end">${new Date(m.createdAt).toLocaleTimeString()}</div>
-          </div>
-        `).join("")
+        box.innerHTML = msgs.map(m => \`
+          <div class="message \${m.sender.username === username ? "sent" : "received"}">
+            \${m.text}
+            <div class="meta text-end">\${new Date(m.createdAt).toLocaleTimeString()}</div>
+          </div>\`
+        ).join("")
         box.scrollTop = box.scrollHeight
-
-        // update stored count so no unread badge
-        localStorage.setItem(`chatCount_${username}_${selectedUser}`, msgs.length)
-        localStorage.setItem(`newchat_${username}_${selectedUser}`, "0")
-        renderContacts()
       } catch {
-        /* ignore */
+        // ignore
       }
     }
 
-    // 7) Check other contacts for unread
-    async function checkUnread() {
-      for (let c of contacts) {
-        if (c.username === selectedUser) continue
-        const keyCount = `chatCount_${username}_${c.username}`
-        let oldCount = parseInt(localStorage.getItem(keyCount)||"0",10)
-        try {
-          const res = await fetch(`${API}/chat/one-to-one/${c.username}`, { credentials:'include' })
-          if (!res.ok) continue
-          const msgs = await res.json()
-          if (msgs.length > oldCount) {
-            localStorage.setItem(`newchat_${username}_${c.username}`, "1")
-            renderContacts()
-          }
-          localStorage.setItem(keyCount, msgs.length)
-        } catch {
-          /* ignore */
+    // 6) Send message
+    async function sendMessage() {
+      const input = document.getElementById("chatInput")
+      const text  = input.value.trim()
+      if (!text) return
+      if (!selectedUser) { alert("Select a user"); return }
+
+      try {
+        const r = await fetch(\`\${API}/chat/one-to-one/\${encodeURIComponent(selectedUser)}\`, {
+          method: 'POST',
+          credentials:'include',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({ text })
+        })
+        if (!r.ok) {
+          const j = await r.json()
+          throw new Error(j.message||"Send failed")
         }
+        input.value = ""
+        isTyping = false
+        fetchAndRender()
+      } catch(e) {
+        alert(e.message)
       }
     }
 
-    // 8) Send a message
-    document.getElementById("sendBtn").addEventListener("click", async () => {
-      const text = document.getElementById("chatInput").value.trim()
-      if (!text || !selectedUser) return
-      await fetch(`${API}/chat/one-to-one/${selectedUser}`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
-      })
-      document.getElementById("chatInput").value = ""
-      isTyping = false
-      fetchAndRender()
-    })
-
-    // 9) Pause polling while typing
+    // 7) Wire up send + typing
+    document.getElementById("sendBtn").addEventListener("click", sendMessage)
     const inp = document.getElementById("chatInput")
+    inp.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault()
+        sendMessage()
+      }
+    })
     inp.addEventListener("focus",  () => isTyping = true)
     inp.addEventListener("blur",   () => { isTyping = false; fetchAndRender() })
     inp.addEventListener("input",  () => {
@@ -382,7 +319,8 @@
       }
     })
 
-    window.addEventListener("DOMContentLoaded", init)
+    // Init
+    window.addEventListener("DOMContentLoaded", injectNavbar)
   </script>
 </body>
 </html>
