@@ -7,53 +7,40 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
   <style>
-    body { background: #0f172a; color: #f8fafc; font-family:'Inter',sans-serif; margin:0 }
-    .navbar { background: rgba(0,0,0,0.9) }
+    body { background:#0f172a; color:#f8fafc; font-family:'Inter',sans-serif; margin:0 }
+    .navbar { background:rgba(0,0,0,0.9) }
     .chat-wrapper {
-      display: none;       /* hide until auth */
-      max-width: 800px;
-      margin: 0 auto;
-      height: calc(100vh - 56px);
-      display: flex;
-      flex-direction: column;
+      display:none;
+      max-width:800px; margin:0 auto;
+      height:calc(100vh - 56px);
+      flex-direction:column; display:flex;
     }
     .chat-header {
-      padding: 1rem;
-      background: #111827;
-      border-bottom: 1px solid #374151;
-      text-align: center;
+      padding:1rem; background:#111827; border-bottom:1px solid #374151;
+      text-align:center;
     }
     .chat-header h4 { color:#facc15; margin:0 }
     .chat-box {
-      flex:1;
-      overflow-y:auto;
-      padding:1rem;
-      background:#0f172a;
+      flex:1; overflow-y:auto; padding:1rem; background:#0f172a;
     }
     .message {
-      max-width:75%;
-      margin:0.5rem 0;
-      padding:0.75rem 1rem;
-      border-radius:15px;
-      word-wrap:break-word;
-      font-size:0.95rem;
+      max-width:75%; margin:0.5rem 0; padding:0.75rem 1rem;
+      border-radius:15px; word-wrap:break-word; font-size:0.95rem;
     }
-    .message.you { background:#4ade80; color:#000; margin-left:auto; }
+    .message.you   { background:#4ade80; color:#000; margin-left:auto; }
     .message.other { background:#334155; color:#f8fafc; margin-right:auto; }
     .meta { font-size:0.75rem; opacity:0.7; text-align:right; margin-top:0.5rem }
     .chat-footer {
-      display:flex; gap:0.5rem;
-      padding:0.75rem; background:#1f2937;
+      display:flex; gap:0.5rem; padding:0.75rem; background:#1f2937;
       border-top:1px solid #374151;
     }
     .chat-footer input {
-      flex:1; padding:0.6rem 1rem; border:none;
-      border-radius:25px; background:#374151; color:#fff;
+      flex:1; padding:0.6rem 1rem; border:none; border-radius:25px;
+      background:#374151; color:#fff;
     }
     .chat-footer button {
       background:#facc15; color:#000; border:none;
-      padding:0.6rem 1.2rem; border-radius:25px;
-      font-weight:bold;
+      padding:0.6rem 1.2rem; border-radius:25px; font-weight:bold;
     }
     .chat-footer button:hover { background:#fde047 }
     @media(max-width:768px){
@@ -62,8 +49,6 @@
   </style>
 </head>
 <body>
-
-  <!-- Navbar -->
   <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
     <div class="container-fluid">
       <a class="navbar-brand text-warning" href="../index.html">
@@ -78,7 +63,6 @@
     </div>
   </nav>
 
-  <!-- Group Chat UI -->
   <div class="chat-wrapper" id="chatContainer">
     <div class="chat-header">
       <h4 id="groupName">Loading…</h4>
@@ -102,10 +86,12 @@
 
     let username, college, isTyping = false, poll;
 
-    // 1) Check auth, build navbar, unhide UI
+    // 1) Auth, navbar & show UI
     async function init() {
       try {
-        const res = await fetch(`${API}/auth/user`, { credentials:'include' });
+        const res = await fetch(`${API}/auth/user`, {
+          credentials: 'include'
+        });
         if (!res.ok) throw 0;
         const user = await res.json();
         username = user.username;
@@ -120,7 +106,7 @@
           </li>`;
 
         groupNameEl.textContent = `${college} Group Chat`;
-        chatContainer.style.display = "flex";
+        chatContainer.style.display = 'flex';
         startPolling();
       } catch {
         window.location.href = "../login.html";
@@ -129,56 +115,60 @@
 
     // 2) Logout
     async function logout() {
-      await fetch(`${API}/auth/logout`, { credentials:'include' });
+      await fetch(`${API}/auth/logout`, {
+        credentials: 'include'
+      });
       window.location.href = "../login.html";
     }
 
-    // 3) Fetch + render messages
+    // 3) Fetch & render
     async function fetchAndRender() {
       if (isTyping) return;
       try {
-        const res = await fetch(`${API}/chat/group`, { credentials:'include' });
+        const res = await fetch(`${API}/chat/group`, {
+          credentials: 'include'
+        });
         if (!res.ok) throw 0;
         const msgs = await res.json();
         chatBox.innerHTML = msgs.map(m => `
-          <div class="message ${m.sender.username===username?'you':'other'}">
+          <div class="message ${m.sender.username === username ? 'you' : 'other'}">
             ${m.text}
             <div class="meta">${new Date(m.createdAt).toLocaleTimeString()}</div>
           </div>
-        `).join("");
+        `).join('');
         chatBox.scrollTop = chatBox.scrollHeight;
       } catch (e) {
-        console.error("Group chat load error:", e);
+        console.error("Error loading group chat:", e);
       }
     }
 
-    // 4) Send a message
+    // 4) Send
     chatForm.addEventListener("submit", async e => {
       e.preventDefault();
       const txt = chatInput.value.trim();
       if (!txt) return;
       await fetch(`${API}/chat/group`, {
-        method:'POST',
-        credentials:'include',
-        headers:{ 'Content-Type':'application/json' },
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: txt })
       });
-      chatInput.value = "";
+      chatInput.value = '';
       isTyping = false;
       fetchAndRender();
     });
 
-    // 5) Pause polling while typing
-    chatInput.addEventListener("focus",  () => isTyping = true);
-    chatInput.addEventListener("blur",   () => { isTyping = false; fetchAndRender(); });
-    chatInput.addEventListener("input",  () => {
+    // 5) Pause/resume polling
+    chatInput.addEventListener("focus", () => isTyping = true);
+    chatInput.addEventListener("blur",  () => { isTyping = false; fetchAndRender(); });
+    chatInput.addEventListener("input", () => {
       if (!chatInput.value.trim()) {
         isTyping = false;
         fetchAndRender();
       }
     });
 
-    // 6) Start polling
+    // 6) Kick off
     function startPolling() {
       fetchAndRender();
       poll = setInterval(fetchAndRender, 1000);
@@ -188,3 +178,4 @@
   </script>
 </body>
 </html>
+```
