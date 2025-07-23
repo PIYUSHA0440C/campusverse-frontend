@@ -138,189 +138,157 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- Chat Logic -->
-  <script>
-    const API = "https://campusverse-backend.onrender.com/api"
-    let username, contacts = [], selectedUser = null
-    let isTyping = false, poll
+ <script>
+  const API = "https://campusverse-backend.onrender.com/api"
+  let username, contacts = [], selectedUser = null
+  let isTyping = false, poll
 
-    // 1) Navbar + Auth
-    async function injectNavbar() {
-      try {
-        const r = await fetch(\`\${API}/auth/user\`, { credentials:'include' })
-        if (!r.ok) throw 0
-        const u = await r.json()
-        username = u.username
-        document.getElementById("nav-user-area").innerHTML = \`
-          <li class="nav-item">
-            <a class="nav-link" href="profile.html">👤 \${username}</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-danger" href="#" onclick="logout()">Logout</a>
-          </li>\`
-        document.getElementById("chatContainer").style.display = "flex"
-      } catch {
-        window.location.href = "login.html"
-      }
-    }
-
-    function logout() {
-      fetch(\`\${API}/auth/logout\`, { credentials:'include' })
-        .then(() => window.location.href = "login.html")
-    }
-
-    // 2) Load + render contacts
-    async function loadContacts() {
-      try {
-        const r = await fetch(\`\${API}/chat/one-to-one/contacts\`, { credentials:'include' })
-        contacts = await r.json()
-      } catch {
-        contacts = []
-      }
-      renderContacts()
-    }
-
-    function renderContacts() {
-      const list = document.getElementById("contactList")
-      list.innerHTML = ""
-      contacts.forEach(c => {
-        const div = document.createElement("div")
-        div.className = "user-item" + (c.username === selectedUser ? " active" : "")
-        div.textContent = c.username
-        // new message badge
-        if (localStorage.getItem(`newchat_\${username}_\${c.username}`) === "1") {
-          const span = document.createElement("span")
-          span.className = "new-badge"
-          span.innerText = "🆕"
-          div.appendChild(span)
-        }
-        div.onclick = () => selectUser(c.username)
-        list.appendChild(div)
-      })
-    }
-
-    // 3) Search suggestions
-    let searchTimer
-    document.getElementById("userSearch").addEventListener("input", () => {
-      clearTimeout(searchTimer)
-      searchTimer = setTimeout(suggest, 300)
-    })
-
-    async function suggest() {
-      const q = document.getElementById("userSearch").value.trim()
-      const ul = document.getElementById("suggestions")
-      ul.innerHTML = ""
-      if (!q) return
-
-      try {
-        const r = await fetch(\`\${API}/users?search=\${encodeURIComponent(q)}\`, {
-          credentials:'include'
-        })
-        if (!r.ok) throw 0
-        const list = await r.json()
-        list
-          .filter(u => u.username !== username && !contacts.find(c=>c.username===u.username))
-          .slice(0,5)
-          .forEach(u => {
-            const li = document.createElement("li")
-            li.textContent = u.username
-            li.onclick = () => {
-              contacts.unshift({ username: u.username })
-              document.getElementById("userSearch").value = ""
-              ul.innerHTML = ""
-              renderContacts()
-              selectUser(u.username)
-            }
-            ul.appendChild(li)
-          })
-      } catch {
-        // ignore
-      }
-    }
-
-    // 4) Select & poll
-    function selectUser(name) {
-      selectedUser = name
-      localStorage.setItem(`newchat_\${username}_\${name}`, "0")
-      renderContacts()
-      document.getElementById("chatMessages").innerHTML = ""
-      clearInterval(poll)
+  async function init() {
+    try {
+      const res = await fetch(`${API}/auth/user`, { credentials: 'include' })
+      if (!res.ok) throw 0
+      const user = await res.json()
+      username = user.username
+      document.getElementById("nav-user-area").innerHTML = `
+        <li class="nav-item"><a class="nav-link" href="profile.html">👤 ${username}</a></li>
+        <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>`
+      document.getElementById("chatContainer").style.display = "flex"
+      await loadContacts()
       startPolling()
+    } catch {
+      window.location.href = "login.html"
     }
+  }
 
-    function startPolling() {
-      clearInterval(poll)
-      poll = setInterval(fetchAndRender, 1000)
+  function logout() {
+    fetch(`${API}/auth/logout`, { credentials: 'include' })
+      .then(() => window.location.href = "login.html")
+  }
+
+  async function loadContacts() {
+    try {
+      const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials: 'include' })
+      contacts = await res.json()
+    } catch { contacts = [] }
+    renderContacts()
+  }
+
+  function renderContacts() {
+    const list = document.getElementById("contactList")
+    list.innerHTML = ""
+    contacts.forEach(c => {
+      const div = document.createElement("div")
+      div.className = "user-item" + (c.username === selectedUser ? " active" : "")
+      div.textContent = c.username
+      div.onclick = () => selectUser(c.username)
+      list.appendChild(div)
+    })
+  }
+
+  let searchTimer
+  document.getElementById("userSearch").addEventListener("input", () => {
+    clearTimeout(searchTimer)
+    searchTimer = setTimeout(suggestUsers, 300)
+  })
+
+  async function suggestUsers() {
+    const query = document.getElementById("userSearch").value.trim()
+    const ul = document.getElementById("suggestions")
+    ul.innerHTML = ""
+    if (!query) return
+
+    try {
+      const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, { credentials: 'include' })
+      if (!res.ok) throw 0
+      const users = await res.json()
+      users
+        .filter(u => u.username !== username && !contacts.find(c => c.username === u.username))
+        .slice(0, 5)
+        .forEach(u => {
+          const li = document.createElement("li")
+          li.textContent = u.username
+          li.onclick = () => {
+            contacts.unshift({ username: u.username })
+            renderContacts()
+            selectUser(u.username)
+            document.getElementById("userSearch").value = ""
+            ul.innerHTML = ""
+          }
+          ul.appendChild(li)
+        })
+    } catch { /* ignore */ }
+  }
+
+  function selectUser(name) {
+    selectedUser = name
+    renderContacts()
+    document.getElementById("chatMessages").innerHTML = ""
+    clearInterval(poll)
+    startPolling()
+  }
+
+  function startPolling() {
+    poll = setInterval(fetchAndRender, 1000)
+    fetchAndRender()
+  }
+
+  async function fetchAndRender() {
+    if (!selectedUser || isTyping) return
+    try {
+      const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials: 'include' })
+      if (!res.ok) return
+      const msgs = await res.json()
+      const box = document.getElementById("chatMessages")
+      box.innerHTML = msgs.map(m => `
+        <div class="message ${m.sender.username === username ? "sent" : "received"}">
+          ${m.text}
+          <div class="meta text-end">${new Date(m.createdAt).toLocaleTimeString()}</div>
+        </div>
+      `).join("")
+      box.scrollTop = box.scrollHeight
+    } catch { /* ignore */ }
+  }
+
+  async function sendMessage() {
+    const text = document.getElementById("chatInput").value.trim()
+    if (!text || !selectedUser) return
+    try {
+      const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      })
+      if (res.ok) {
+        document.getElementById("chatInput").value = ""
+        isTyping = false
+        fetchAndRender()
+      }
+    } catch { /* ignore */ }
+  }
+
+  document.getElementById("sendBtn").addEventListener("click", sendMessage)
+  const inputEl = document.getElementById("chatInput")
+  inputEl.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      sendMessage()
+    }
+  })
+  inputEl.addEventListener("focus", () => isTyping = true)
+  inputEl.addEventListener("blur", () => {
+    isTyping = false
+    fetchAndRender()
+  })
+  inputEl.addEventListener("input", () => {
+    if (!inputEl.value.trim()) {
+      isTyping = false
       fetchAndRender()
     }
+  })
 
-    // 5) Fetch + render convo
-    async function fetchAndRender() {
-      if (!selectedUser || isTyping) return
-      try {
-        const r = await fetch(\`\${API}/chat/one-to-one/\${encodeURIComponent(selectedUser)}\`, {
-          credentials:'include'
-        })
-        if (!r.ok) return
-        const msgs = await r.json()
-        const box = document.getElementById("chatMessages")
-        box.innerHTML = msgs.map(m => \`
-          <div class="message \${m.sender.username === username ? "sent" : "received"}">
-            \${m.text}
-            <div class="meta text-end">\${new Date(m.createdAt).toLocaleTimeString()}</div>
-          </div>\`
-        ).join("")
-        box.scrollTop = box.scrollHeight
-      } catch {
-        // ignore
-      }
-    }
+  window.addEventListener("DOMContentLoaded", init)
+</script>
 
-    // 6) Send message
-    async function sendMessage() {
-      const input = document.getElementById("chatInput")
-      const text  = input.value.trim()
-      if (!text) return
-      if (!selectedUser) { alert("Select a user"); return }
-
-      try {
-        const r = await fetch(\`\${API}/chat/one-to-one/\${encodeURIComponent(selectedUser)}\`, {
-          method: 'POST',
-          credentials:'include',
-          headers: { 'Content-Type':'application/json' },
-          body: JSON.stringify({ text })
-        })
-        if (!r.ok) {
-          const j = await r.json()
-          throw new Error(j.message||"Send failed")
-        }
-        input.value = ""
-        isTyping = false
-        fetchAndRender()
-      } catch(e) {
-        alert(e.message)
-      }
-    }
-
-    // 7) Wire up send + typing
-    document.getElementById("sendBtn").addEventListener("click", sendMessage)
-    const inp = document.getElementById("chatInput")
-    inp.addEventListener("keydown", e => {
-      if (e.key === "Enter") {
-        e.preventDefault()
-        sendMessage()
-      }
-    })
-    inp.addEventListener("focus",  () => isTyping = true)
-    inp.addEventListener("blur",   () => { isTyping = false; fetchAndRender() })
-    inp.addEventListener("input",  () => {
-      if (!inp.value.trim()) {
-        isTyping = false
-        fetchAndRender()
-      }
-    })
-
-    // Init
-    window.addEventListener("DOMContentLoaded", injectNavbar)
-  </script>
 </body>
 </html>
