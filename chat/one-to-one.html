@@ -138,7 +138,8 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- Chat Logic -->
- <script>
+ <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
   const API = "https://campusverse-backend.onrender.com/api"
   let username, contacts = [], selectedUser = null
   let isTyping = false, poll
@@ -149,12 +150,12 @@
       if (!res.ok) throw 0
       const user = await res.json()
       username = user.username
+
       document.getElementById("nav-user-area").innerHTML = `
         <li class="nav-item"><a class="nav-link" href="profile.html">👤 ${username}</a></li>
         <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>`
       document.getElementById("chatContainer").style.display = "flex"
       await loadContacts()
-      startPolling()
     } catch {
       window.location.href = "login.html"
     }
@@ -169,7 +170,9 @@
     try {
       const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials: 'include' })
       contacts = await res.json()
-    } catch { contacts = [] }
+    } catch {
+      contacts = []
+    }
     renderContacts()
   }
 
@@ -198,25 +201,35 @@
     if (!query) return
 
     try {
-      const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, { credentials: 'include' })
-      if (!res.ok) throw 0
+      const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, {
+        credentials: 'include'
+      })
+      if (!res.ok) return
       const users = await res.json()
-      users
-        .filter(u => u.username !== username && !contacts.find(c => c.username === u.username))
+      const filtered = users
+        .filter(u => u.username !== username && !contacts.some(c => c.username === u.username))
         .slice(0, 5)
-        .forEach(u => {
-          const li = document.createElement("li")
-          li.textContent = u.username
-          li.onclick = () => {
-            contacts.unshift({ username: u.username })
-            renderContacts()
-            selectUser(u.username)
-            document.getElementById("userSearch").value = ""
-            ul.innerHTML = ""
-          }
-          ul.appendChild(li)
-        })
-    } catch { /* ignore */ }
+
+      if (filtered.length === 0) {
+        ul.innerHTML = `<li class="text-muted">No matches found</li>`
+        return
+      }
+
+      filtered.forEach(u => {
+        const li = document.createElement("li")
+        li.textContent = u.username
+        li.onclick = () => {
+          contacts.unshift({ username: u.username })
+          renderContacts()
+          selectUser(u.username)
+          document.getElementById("userSearch").value = ""
+          ul.innerHTML = ""
+        }
+        ul.appendChild(li)
+      })
+    } catch (err) {
+      ul.innerHTML = `<li class="text-danger">Error fetching users</li>`
+    }
   }
 
   function selectUser(name) {
@@ -235,7 +248,9 @@
   async function fetchAndRender() {
     if (!selectedUser || isTyping) return
     try {
-      const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials: 'include' })
+      const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, {
+        credentials: 'include'
+      })
       if (!res.ok) return
       const msgs = await res.json()
       const box = document.getElementById("chatMessages")
@@ -246,12 +261,14 @@
         </div>
       `).join("")
       box.scrollTop = box.scrollHeight
-    } catch { /* ignore */ }
+    } catch {}
   }
 
   async function sendMessage() {
-    const text = document.getElementById("chatInput").value.trim()
+    const input = document.getElementById("chatInput")
+    const text = input.value.trim()
     if (!text || !selectedUser) return
+
     try {
       const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, {
         method: "POST",
@@ -260,28 +277,28 @@
         body: JSON.stringify({ text })
       })
       if (res.ok) {
-        document.getElementById("chatInput").value = ""
+        input.value = ""
         isTyping = false
         fetchAndRender()
       }
-    } catch { /* ignore */ }
+    } catch {}
   }
 
   document.getElementById("sendBtn").addEventListener("click", sendMessage)
-  const inputEl = document.getElementById("chatInput")
-  inputEl.addEventListener("keydown", e => {
+  const inp = document.getElementById("chatInput")
+  inp.addEventListener("keydown", e => {
     if (e.key === "Enter") {
       e.preventDefault()
       sendMessage()
     }
   })
-  inputEl.addEventListener("focus", () => isTyping = true)
-  inputEl.addEventListener("blur", () => {
+  inp.addEventListener("focus", () => isTyping = true)
+  inp.addEventListener("blur", () => {
     isTyping = false
     fetchAndRender()
   })
-  inputEl.addEventListener("input", () => {
-    if (!inputEl.value.trim()) {
+  inp.addEventListener("input", () => {
+    if (!inp.value.trim()) {
       isTyping = false
       fetchAndRender()
     }
@@ -289,6 +306,7 @@
 
   window.addEventListener("DOMContentLoaded", init)
 </script>
+
 
 </body>
 </html>
