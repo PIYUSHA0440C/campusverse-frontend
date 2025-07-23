@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Resource Hub | CampusVerse</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background: linear-gradient(to bottom right, #0f172a, #1e293b);
+      color: #f8fafc;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .navbar {
+      background-color: rgba(0, 0, 0, 0.95);
+    }
+    .navbar-brand, .nav-link {
+      color: #facc15 !important;
+    }
+    .form-control, .form-select {
+      background-color: #1e293b;
+      color: white;
+      border: 1px solid #334155;
+    }
+    .form-control::placeholder {
+      color: #94a3b8;
+    }
+    .card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      transition: 0.3s;
+    }
+    .card:hover {
+      background-color: #334155;
+      transform: scale(1.01);
+    }
+    .card-title, .card-text, .resource-link {
+      color: #f1f5f9;
+    }
+    .resource-link {
+      text-decoration: none;
+      color: #38bdf8;
+      font-weight: 500;
+    }
+    .resource-link:hover {
+      text-decoration: underline;
+      color: #0ea5e9;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg sticky-top">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="index.html">📁 CampusVerse</a>
+    <div class="collapse navbar-collapse justify-content-end">
+      <ul class="navbar-nav" id="nav-user-area"></ul>
+    </div>
+  </div>
+</nav>
+
+<!-- Main Section -->
+<div class="container py-4">
+  <h2 class="mb-4">🔎 Search & Access Study Resources</h2>
+
+  <!-- Upload Section -->
+  <form id="uploadForm" class="row g-3 mb-4">
+    <div class="col-md-3">
+      <input type="text" id="title" class="form-control" placeholder="Title (e.g. DSA Notes)" required />
+    </div>
+    <div class="col-md-3">
+      <input type="url" id="link" class="form-control" placeholder="Drive/Youtube/Blog Link" required />
+    </div>
+    <div class="col-md-3">
+      <input type="text" id="subject" class="form-control" placeholder="Subject (e.g. CS, Physics)" required />
+    </div>
+    <div class="col-md-3 d-grid">
+      <button type="submit" class="btn btn-warning">Upload</button>
+    </div>
+  </form>
+
+  <!-- Filter/Search Section -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <input type="text" class="form-control" id="searchInput" placeholder="Search by Title or Subject..." />
+    </div>
+    <div class="col-md-4">
+      <select id="subjectFilter" class="form-select">
+        <option value="">All Subjects</option>
+        <option value="CS">CS</option>
+        <option value="Physics">Physics</option>
+        <option value="Maths">Maths</option>
+        <option value="Chemistry">Chemistry</option>
+        <option value="Biology">Biology</option>
+        <option value="English">English</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Resource Display -->
+  <div class="row" id="resourceList"></div>
+</div>
+
+<script>
+  const API_BASE = "https://campusverse-backend.onrender.com/api";
+  const navArea = document.getElementById("nav-user-area");
+
+  async function updateNavbar() {
+    try {
+      const res = await fetch(`${API_BASE}/auth/user`, {
+        credentials: "include"
+      });
+      if (!res.ok) throw new Error();
+      const { username } = await res.json();
+      navArea.innerHTML = `
+        <li class="nav-item"><a class="nav-link" href="profile.html">👤 ${username}</a></li>
+        <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>
+      `;
+    } catch {
+      navArea.innerHTML = `
+        <li class="nav-item"><a class="nav-link" href="login.html">Login</a></li>
+        <li class="nav-item"><a class="nav-link" href="register.html">Register</a></li>
+      `;
+    }
+  }
+
+  async function logout() {
+    await fetch(`${API_BASE}/auth/logout`, { credentials: "include" });
+    window.location.href = "login.html";
+  }
+
+  // Submit Resource
+  document.getElementById("uploadForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const payload = {
+      title: document.getElementById("title").value.trim(),
+      link: document.getElementById("link").value.trim(),
+      subject: document.getElementById("subject").value.trim()
+    };
+    await fetch(`${API_BASE}/resources`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    e.target.reset();
+    loadResources();
+  });
+
+  // Load Resources
+  async function loadResources() {
+    const res = await fetch(`${API_BASE}/resources`, { credentials: "include" });
+    const list = await res.json();
+    renderResources(list);
+  }
+
+  // Filter Resources
+  document.getElementById("searchInput").addEventListener("input", filterResources);
+  document.getElementById("subjectFilter").addEventListener("change", filterResources);
+
+  async function filterResources() {
+    const keyword = document.getElementById("searchInput").value.trim().toLowerCase();
+    const subject = document.getElementById("subjectFilter").value;
+    const res = await fetch(`${API_BASE}/resources`, { credentials: "include" });
+    const data = await res.json();
+
+    const filtered = data.filter(r => {
+      const matchKeyword = r.title.toLowerCase().includes(keyword) || r.subject.toLowerCase().includes(keyword);
+      const matchSubject = !subject || r.subject === subject;
+      return matchKeyword && matchSubject;
+    });
+
+    renderResources(filtered);
+  }
+
+  // Render cards
+  function renderResources(resources) {
+    const container = document.getElementById("resourceList");
+    container.innerHTML = resources.map(({ title, subject, link }) => `
+      <div class="col-md-6 mb-3">
+        <div class="card p-3">
+          <h5 class="card-title">📌 ${title}</h5>
+          <p class="card-text"><strong>Subject:</strong> ${subject}</p>
+          <a class="resource-link" href="${link}" target="_blank">🔗 View Resource</a>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    updateNavbar();
+    loadResources();
+  });
+</script>
+
+</body>
+</html>
