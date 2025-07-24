@@ -171,13 +171,13 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   const API = "https://campusverse-backend.onrender.com/api";
-  let username, contacts = [], selectedUser  = null;
+  let username, contacts = [], selectedUser = null;
   let isTyping = false, poll;
 
   async function init() {
     try {
       const res = await fetch(`${API}/auth/user`, { credentials: 'include' });
-      if (!res.ok) throw new Error("Failed to authenticate user");
+      if (!res.ok) throw 0;
       const user = await res.json();
       username = user.username;
 
@@ -187,8 +187,7 @@
       document.getElementById("chatContainer").style.display = "flex";
 
       await loadContacts();
-    } catch (error) {
-      console.error("Initialization error:", error);
+    } catch {
       window.location.href = "login.html";
     }
   }
@@ -203,12 +202,11 @@
       const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to load contacts");
       contacts = await res.json();
-      renderContacts();
-    } catch (error) {
-      console.error("Error loading contacts:", error);
+    } catch (err) {
+      console.error("Error loading contacts:", err);
       contacts = [];
-      renderContacts();
     }
+    renderContacts();
   }
 
   function renderContacts() {
@@ -219,140 +217,83 @@
     }
     contacts.forEach(c => {
       const div = document.createElement("div");
-      div.className = "user-item" + (c.username === selectedUser  ? " active" : "");
+      div.className = "user-item" + (c.username === selectedUser ? " active" : "");
       div.textContent = c.username;
-      div.onclick = () => selectUser (c.username);
+      div.onclick = () => selectUser(c.username);
       list.appendChild(div);
     });
   }
 
-  document.getElementById("userSearch").addEventListener("input", function() {
-    clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(suggestUsers.bind(this), 300);
+  let searchTimer;
+  document.getElementById("userSearch").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(suggestUsers, 300);
   });
-  
-  document.getElementById("userSearch").addEventListener("focus", suggestUsers);
 
   async function suggestUsers() {
     const query = document.getElementById("userSearch").value.trim();
+    const ul = document.getElementById("suggestions");
+    ul.innerHTML = "";
     if (!query) {
-      document.getElementById("suggestions").style.display = 'none';
+      ul.style.display = 'none'; // Hide suggestions if query is empty
       return;
     }
-
-    const ul = document.getElementById("suggestions");
-    ul.innerHTML = `<li class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Finding users...</li>`;
-    ul.style.display = 'block';
+    ul.style.display = 'block'; // Show suggestions
 
     try {
-      const res = await fetch(`${API}/users/search?username=${encodeURIComponent(query)}`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json' 
-        }
-      });
-      
+      const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, { credentials: 'include' });
       if (!res.ok) {
-        const error = await res.text();
-        console.error("Search API error:", res.status, error);
-        throw new Error(error || "Search failed");
+        ul.innerHTML = `<li class="text-danger">Error fetching users</li>`;
+        return;
       }
-      
-      const data = await res.json();
-      const users = data.users || data.data || [];
-      if (!Array.isArray(users)) {
-        console.warn("Invalid users data format:", data);
-        throw new Error("Server returned invalid user data");
-      }
+      const users = await res.json();
 
-      if (!users || !users.length) {
-        ul.innerHTML = `
-          <li class="text-muted px-2 py-1">
-            <i class="fas fa-user-times me-2"></i>
-            No users match your search
-          </li>`;
+      const filtered = users
+        .filter(u => u.username !== username && !contacts.some(c => c.username === u.username))
+        .slice(0, 5);
+
+      if (filtered.length === 0) {
+        ul.innerHTML = `<li class="text-muted">No matches found</li>`;
         return;
       }
 
-      const filtered = users.filter(u => 
-        u.username && 
-        u.username !== username && 
-        !contacts.some(c => c.username === u.username)
-      ).slice(0, 5);
-
-      if (!filtered.length) {
-        ul.innerHTML = `
-          <li class="text-muted">
-            <i class="fas fa-user-slash"></i>
-            No matching users found
-          </li>`;
-        return;
-      }
-
-      ul.innerHTML = filtered.map(u => `
-        <li onclick="addUser Contact('${u.username}')" class="p-2">
-          <i class="fas fa-user-plus me-2"></i>
-          ${u.username}
-        </li>
-      `).join('');
-
-    } catch (error) {
-      console.error("Search error:", error);
-      ul.innerHTML = `
-        <li class="text-muted">
-          <i class="fas fa-exclamation-circle me-2"></i>
-          Search issue - ${error.message || "Please try again"}
-        </li>`;
-      setTimeout(() => {
-        ul.style.display = 'none';
-      }, 2000);
-    }
-  }
-
-  async function addUser Contact(username) {
-    try {
-      const res = await fetch(`${API}/chat/one-to-one/contacts`, {
-        method: "POST",
-        credentials: "include",
-        headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({ contact: username })
+      filtered.forEach(u => {
+        const li = document.createElement("li");
+        li.textContent = u.username;
+        li.onclick = async () => {
+          // Add contact to backend (this will implicitly add it to the contact list)
+          await fetch(`${API}/chat/one-to-one/contacts`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contact: u.username })
+          });
+          await loadContacts(); // Reload contacts to show the new one
+          selectUser(u.username);
+          document.getElementById("userSearch").value = "";
+          ul.innerHTML = "";
+          ul.style.display = 'none'; // Hide suggestions after selection
+        };
+        ul.appendChild(li);
       });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message);
-      }
-      
-      // Clear search and hide dropdown
-      document.getElementById("userSearch").value = "";
-      document.getElementById("suggestions").style.display = 'none';
-      
-      // Refresh contacts list
-      await loadContacts();
-      
-      // Select the newly added user
-      selectUser (username);
-      
-    } catch (error) {
-      console.error("Add contact error:", error);
-      alert("Failed to add contact: " + error.message);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      ul.innerHTML = `<li class="text-danger">Error fetching users</li>`;
     }
   }
 
-  // Close dropdown when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.search-box')) {
-      document.getElementById('suggestions').style.display = 'none';
+  // Hide suggestions when clicking outside
+  document.addEventListener('click', (event) => {
+    const searchBox = document.querySelector('.search-box');
+    const suggestionsList = document.getElementById('suggestions');
+    if (!searchBox.contains(event.target)) {
+      suggestionsList.style.display = 'none';
     }
   });
 
 
-  function selectUser (name) {
-    selectedUser  = name;
+  function selectUser(name) {
+    selectedUser = name;
     renderContacts(); // Re-render to highlight the selected user
     document.getElementById("chatMessages").innerHTML = `<p class="text-center text-muted">Loading messages...</p>`;
     clearInterval(poll); // Clear previous polling interval
@@ -365,9 +306,9 @@
   }
 
   async function fetchAndRender() {
-    if (!selectedUser  || isTyping) return;
+    if (!selectedUser || isTyping) return;
     try {
-      const res = await fetch(`${API}/chat/messages/${encodeURIComponent(selectedUser )}`, {
+      const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, {
         credentials: 'include'
       });
       if (!res.ok) {
@@ -386,8 +327,8 @@
         </div>
       `).join("");
       box.scrollTop = box.scrollHeight; // Scroll to bottom
-    } catch (error) {
-      console.error("Message fetch error:", error);
+    } catch (err) {
+      console.error("Message fetch error:", err);
       document.getElementById("chatMessages").innerHTML = `<p class="text-center text-danger">Error fetching messages.</p>`;
     }
   }
@@ -395,10 +336,10 @@
   async function sendMessage() {
     const input = document.getElementById("chatInput");
     const text = input.value.trim();
-    if (!text || !selectedUser ) return;
+    if (!text || !selectedUser) return;
 
     try {
-      const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser )}`, {
+      const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -412,8 +353,8 @@
         console.error("Message send failed", res.status, await res.text());
         alert("Failed to send message.");
       }
-    } catch (error) {
-      console.error("Error sending message:", error);
+    } catch (err) {
+      console.error("Error sending message:", err);
       alert("Error sending message.");
     }
   }
