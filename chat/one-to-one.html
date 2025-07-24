@@ -200,14 +200,7 @@
 
   async function loadContacts() {
     try {
-      const res = await fetch(`${API}/chat/add-contact`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({ username: username }) credentials: 'include' });
+      const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to load contacts");
       contacts = await res.json();
       renderContacts();
@@ -252,7 +245,7 @@
     ul.style.display = 'block';
 
     try {
-      const res = await fetch(`${API}/users/search-users?q=${encodeURIComponent(query)}`, {
+      const res = await fetch(`${API}/users/search?username=${encodeURIComponent(query)}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -267,16 +260,7 @@
       }
       
       const data = await res.json();
-      // Handle different response formats
-      let users = [];
-      if (Array.isArray(data)) {
-        users = data;
-      } else if (data.users) {
-        users = data.users;
-      } else if (data.data) {
-        users = data.data;
-      }
-      console.log('Found users:', users); // Debug log
+      const users = data.users || data.data || [];
       if (!Array.isArray(users)) {
         console.warn("Invalid users data format:", data);
         throw new Error("Server returned invalid user data");
@@ -307,7 +291,7 @@
       }
 
       ul.innerHTML = filtered.map(u => `
-        <li onclick="addUserContact('${u.username}')" class="p-2">
+        <li onclick="addUser Contact('${u.username}')" class="p-2">
           <i class="fas fa-user-plus me-2"></i>
           ${u.username}
         </li>
@@ -326,7 +310,7 @@
     }
   }
 
-  async function addUserContact(username) {
+  async function addUser Contact(username) {
     try {
       const res = await fetch(`${API}/chat/one-to-one/contacts`, {
         method: "POST",
