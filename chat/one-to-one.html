@@ -133,16 +133,22 @@
         li.textContent = u.username;
         li.onclick = async () => {
           pausePolling();
+
           await fetch(`${API}/chat/one-to-one/contacts`, {
             method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ contact: u.username })
           });
+
           await loadContacts();
-          selectUser(u.username);
+          selectedUser = u.username;
+          renderContacts();
+          fetchAndRender();
+
           document.getElementById("userSearch").value = "";
           ul.innerHTML = "";
           ul.style.display = 'none';
+
           resumePolling();
         };
         ul.appendChild(li);
