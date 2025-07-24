@@ -247,9 +247,28 @@
     ul.style.display = 'block';
 
     try {
-      const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, {
-        credentials: 'include'
-      });
+      // Try multiple possible API endpoints for user search
+      let res;
+      let endpoints = [
+        `${API}/users/search?q=${encodeURIComponent(query)}`,
+        `${API}/users?search=${encodeURIComponent(query)}`,
+        `${API}/user/search?username=${encodeURIComponent(query)}`
+      ];
+      
+      for (let endpoint of endpoints) {
+        try {
+          res = await fetch(endpoint, {
+            credentials: 'include'
+          });
+          if (res.ok) break;
+        } catch (err) {
+          console.log(`Tried ${endpoint} but failed`);
+        }
+      }
+
+      if (!res || !res.ok) {
+        throw new Error('All search endpoints failed');
+      }
       
       if (!res.ok) {
         const errorText = await res.text();
@@ -257,7 +276,17 @@
         throw new Error(errorText || "Search failed");
       }
       
-      const users = await res.json();
+      let users = await res.json();
+      // Handle different response formats
+      if (Array.isArray(users)) {
+        // Response is already an array
+      } else if (users.users) {
+        users = users.users;
+      } else if (users.data) {
+        users = users.data;
+      } else {
+        users = [];
+      }
 
       if (!users || !users.length) {
         ul.innerHTML = `
@@ -294,13 +323,19 @@
       console.error("Search error:", err);
       ul.innerHTML = `
         <li class="text-muted px-2 py-1">
-          <i class="fas fa-search me-2"></i>
-          Couldn't load suggestions
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          Search temporarily unavailable
         </li>
         <li class="text-muted px-2 py-1 text-small">
-          Try refreshing the page
+          <button class="btn btn-sm btn-outline-light" onclick="suggestUsers()">
+            <i class="fas fa-sync-alt me-1"></i> Retry
+          </button>
         </li>`;
-      setTimeout(() => ul.style.display = 'none', 3000);
+      setTimeout(() => {
+        if (ul.innerHTML.includes("unavailable")) {
+          ul.style.display = 'none';
+        }
+      }, 5000);
     }
   }
 
