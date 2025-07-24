@@ -14,12 +14,11 @@
     .search-box input { width: 100%; padding: 0.4rem; border-radius: 8px; border: none; background: #374151; color: #fff; margin-bottom: 0.5rem; }
     .suggestions { list-style: none; padding: 0; margin: 0; max-height: 150px; overflow-y: auto; background: #1e293b; border-radius: 8px; position: absolute; width: calc(100% - 2rem); z-index: 100; }
     .suggestions li { padding: 0.4rem 0.6rem; cursor: pointer; color: #f8fafc; border-bottom: 1px solid #334155; }
-    .suggestions li:last-child { border-bottom: none; }
     .suggestions li:hover { background: #475569; }
     .user-item { padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; cursor: pointer; }
     .user-item.active { background: #475569; }
-    .user-item:hover { background: #334155; }
     .chat-main { flex: 1; display: flex; flex-direction: column; background: #111827; }
+    .chat-header { padding: 0.75rem 1rem; border-bottom: 1px solid #1f2937; background: #1f2937; font-weight: bold; font-size: 1rem; color: #facc15; }
     .message-box { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; }
     .message { padding: 0.6rem 1rem; margin-bottom: 10px; border-radius: 10px; max-width: 70%; word-wrap: break-word; font-size: 0.95rem; }
     .sent { background-color: #2563eb; align-self: flex-end; color: #fff; }
@@ -30,7 +29,6 @@
     .input-area button:hover { background: #fde047; }
   </style>
 </head>
-
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
   <div class="container-fluid">
@@ -53,7 +51,8 @@
     <div id="contactList"></div>
   </div>
   <div class="chat-main">
-    <div class="message-box" id="chatMessages"><p class="text-center text-muted">Select a user to start chatting</p></div>
+    <div class="chat-header" id="chatHeader">Select a user to start chatting</div>
+    <div class="message-box" id="chatMessages"></div>
     <div class="input-area">
       <input id="chatInput" placeholder="Type a message…" autocomplete="off" />
       <button id="sendBtn">Send</button>
@@ -133,22 +132,16 @@
         li.textContent = u.username;
         li.onclick = async () => {
           pausePolling();
-
           await fetch(`${API}/chat/one-to-one/contacts`, {
             method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ contact: u.username })
           });
-
           await loadContacts();
-          selectedUser = u.username;
-          renderContacts();
-          fetchAndRender();
-
+          selectUser(u.username); // Render and scroll immediately
           document.getElementById("userSearch").value = "";
           ul.innerHTML = "";
           ul.style.display = 'none';
-
           resumePolling();
         };
         ul.appendChild(li);
@@ -167,6 +160,7 @@
 
   function selectUser(name) {
     selectedUser = name;
+    document.getElementById("chatHeader").textContent = `Chatting with ${name}`;
     renderContacts();
     document.getElementById("chatMessages").innerHTML = `<p class="text-center text-muted">Loading messages...</p>`;
     clearInterval(poll);
