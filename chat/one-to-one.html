@@ -224,63 +224,36 @@
     });
   }
 
-  let searchTimer;
-  document.getElementById("userSearch").addEventListener("input", () => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(suggestUsers, 300);
+  document.getElementById("userSearch").addEventListener("input", function() {
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(suggestUsers.bind(this), 300);
   });
+  
+  document.getElementById("userSearch").addEventListener("focus", suggestUsers);
 
   async function suggestUsers() {
     const query = document.getElementById("userSearch").value.trim();
     if (!query) {
       document.getElementById("suggestions").style.display = 'none';
-      document.getElementById("suggestions").innerHTML = "";
       return;
     }
 
     const ul = document.getElementById("suggestions");
-    ul.innerHTML = `
-      <li class="text-muted px-2 py-1">
-        <i class="fas fa-spinner fa-spin me-2"></i>
-        Searching for users...
-      </li>`;
+    ul.innerHTML = `<li class="text-muted">Searching users...</li>`;
     ul.style.display = 'block';
 
     try {
-      // Try multiple possible API endpoints for user search
-      let res;
-      let endpoints = [
-        `${API}/users/search?term=${encodeURIComponent(query)}`,
-        `${API}/user/search?term=${encodeURIComponent(query)}`
-      ];
-      
-      for (let endpoint of endpoints) {
-        try {
-          res = await fetch(endpoint, {
-            credentials: 'include'
-          });
-          if (res.ok) break;
-        } catch (err) {
-          console.log(`Tried ${endpoint} but failed`);
-        }
-      }
-
-      if (!res || !res.ok) {
-        throw new Error('All search endpoints failed');
-      }
+      const res = await fetch(`${API}/users/search?username=${encodeURIComponent(query)}`, {
+        credentials: 'include'
+      });
       
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Search API error:", res.status, errorText);
-        throw new Error(errorText || "Search failed");
+        console.log("Search response:", res.status, res);
+        throw new Error('Failed to fetch users');
       }
       
-      const response = await res.json();
-      const users = response.users || response.data || [];
-      if (!Array.isArray(users)) {
-        console.error("Invalid users format:", users);
-        throw new Error("Invalid response format");
-      }
+      const data = await res.json();
+      const users = data.users || data.data || [];
 
       if (!users || !users.length) {
         ul.innerHTML = `
@@ -342,22 +315,27 @@
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contact: username })
+        body: JSON.stringify({ username })
       });
 
       if (!res.ok) {
-        throw new Error(await res.text());
+        const err = await res.json();
+        throw new Error(err.message);
       }
       
       // Clear search and hide dropdown
-      const searchInput = document.getElementById("userSearch");
-      searchInput.value = "";
-      searchInput.blur();
+      document.getElementById("userSearch").value = "";
       document.getElementById("suggestions").style.display = 'none';
+      
+      // Refresh contacts list
       await loadContacts();
+      
+      // Select the newly added user
       selectUser(username);
+      
     } catch (err) {
       console.error("Add contact error:", err);
+      alert("Failed to add contact: " + err.message);
     }
   }
 
