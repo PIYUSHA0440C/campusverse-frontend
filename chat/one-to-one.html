@@ -239,11 +239,11 @@
     }
 
     const ul = document.getElementById("suggestions");
-    ul.innerHTML = `<li class="text-muted">Searching users...</li>`;
+    ul.innerHTML = `<li class="text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Finding users...</li>`;
     ul.style.display = 'block';
 
     try {
-      const res = await fetch(`${API}/users/search-users?q=${encodeURIComponent(query)}`, {
+      const res = await fetch(`${API}/users/search?username=${encodeURIComponent(query)}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -257,10 +257,13 @@
         throw new Error(error || "Search failed");
       }
       
-      const response = await res.json();
-      const users = Array.isArray(response) ? response : 
-                  response.users ? response.users :
-                  response.data ? response.data : [];
+      const data = await res.json();
+      // Handle different API response formats
+      const users = data.users || data.data || [];
+      if (!Array.isArray(users)) {
+        console.warn("Invalid users data format:", data);
+        throw new Error("Server returned invalid user data");
+      }
 
       if (!users || !users.length) {
         ul.innerHTML = `
@@ -296,14 +299,13 @@
     } catch (err) {
       console.error("Search error:", err);
       ul.innerHTML = `
-        <li class="text-muted px-2 py-1">
-          <i class="fas fa-exclamation-triangle me-2"></i>
-          Could not load suggestions
-        </li>
-        <li class="text-muted px-2 py-1">
-          <small>Please try again later</small>
+        <li class="text-muted">
+          <i class="fas fa-exclamation-circle me-2"></i>
+          Search issue - ${err.message || "Please try again"}
         </li>`;
-      setTimeout(() => ul.style.display = 'none', 3000);
+      setTimeout(() => {
+        ul.style.display = 'none';
+      }, 2000);
     }
   }
 
@@ -312,8 +314,11 @@
       const res = await fetch(`${API}/chat/one-to-one/contacts`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username })
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({ contact: username })
       });
 
       if (!res.ok) {
