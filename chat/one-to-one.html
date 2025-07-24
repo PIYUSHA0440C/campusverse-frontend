@@ -240,14 +240,16 @@
 
     const ul = document.getElementById("suggestions");
     ul.innerHTML = `
-      <li class="text-muted">
-        <i class="fas fa-spinner fa-spin me-2"></i>
-        Loading user suggestions...
+      <li class="text-muted px-2 py-1">
+        <div class="d-flex align-items-center">
+          <i class="fas fa-spinner fa-spin me-2"></i>
+          <span>Finding users...</span>
+        </div>
       </li>`;
     ul.style.display = 'block';
 
     try {
-      const res = await fetch(`${API}/user/search-users?q=${encodeURIComponent(query)}`, {
+      const res = await fetch(`${API}/users/search?username=${encodeURIComponent(query)}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -255,8 +257,12 @@
         }
       });
       
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const users = await res.json();
+      if (!res.ok) {
+        console.log("Search API response:", res.status, res);
+        throw new Error(`Search failed with status ${res.status}`);
+      }
+      const data = await res.json();
+      const users = data.data || [];
 
       if (!users || !users.length) {
         ul.innerHTML = `<li class="text-muted">No users found</li>`;
@@ -288,13 +294,14 @@
     } catch (err) {
       console.error("Search error:", err);
       ul.innerHTML = `
-        <li class="text-muted">
-          <i class="fas fa-info-circle me-2"></i>
-          Could not load suggestions. Try again later.
+        <li class="text-muted px-2 py-1">
+          <i class="fas fa-wifi-slash me-2"></i>
+          Please check your connection
+        </li>
+        <li class="text-muted px-2 py-1">
+          <small>Search unavailable temporarily</small>
         </li>`;
-      setTimeout(() => {
-        ul.style.display = 'none';
-      }, 2000);
+      setTimeout(() => ul.style.display = 'none', 3000);
     }
   }
 
