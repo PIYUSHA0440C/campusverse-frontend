@@ -235,59 +235,69 @@
     const ul = document.getElementById("suggestions");
     ul.innerHTML = "";
     if (!query) {
-      ul.style.display = 'none'; // Hide suggestions if query is empty
+      ul.style.display = 'none'; 
       return;
     }
-    ul.style.display = 'block'; // Show suggestions
+    ul.style.display = 'block';
+    ul.innerHTML = `<li class="text-muted">Loading...</li>`;
 
     try {
-      const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, { credentials: 'include' });
-      if (!res.ok) {
-        ul.innerHTML = `<li class="text-danger">Error fetching users</li>`;
-        return;
-      }
+      const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, { 
+        credentials: 'include' 
+      });
+      if (!res.ok) throw new Error('Failed to fetch');
       const users = await res.json();
 
-      const filtered = users
-        .filter(u => u.username !== username && !contacts.some(c => c.username === u.username))
-        .slice(0, 5);
-
-      if (filtered.length === 0) {
-        ul.innerHTML = `<li class="text-muted">No matches found</li>`;
+      if (!users || !users.length) {
+        ul.innerHTML = `<li class="text-muted">No users found</li>`;
         return;
       }
 
-      filtered.forEach(u => {
-        const li = document.createElement("li");
-        li.textContent = u.username;
-        li.onclick = async () => {
-          // Add contact to backend (this will implicitly add it to the contact list)
-          await fetch(`${API}/chat/one-to-one/contacts`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contact: u.username })
-          });
-          await loadContacts(); // Reload contacts to show the new one
-          selectUser(u.username);
-          document.getElementById("userSearch").value = "";
-          ul.innerHTML = "";
-          ul.style.display = 'none'; // Hide suggestions after selection
-        };
-        ul.appendChild(li);
-      });
+      const filtered = users.filter(u => {
+        return u.username && 
+               u.username !== username && 
+               !contacts.some(c => c.username === u.username);
+      }).slice(0, 5);
+
+      if (!filtered.length) {
+        ul.innerHTML = `<li class="text-muted">No matching contacts</li>`;
+        return;
+      }
+
+      ul.innerHTML = filtered.map(u => `
+        <li onclick="addUserContact('${u.username}')">
+          ${u.username}
+        </li>
+      `).join('');
+
     } catch (err) {
-      console.error("Error fetching users:", err);
-      ul.innerHTML = `<li class="text-danger">Error fetching users</li>`;
+      console.error("Search error:", err);
+      ul.innerHTML = `<li class="text-danger">Connection error</li>`;
     }
   }
 
-  // Hide suggestions when clicking outside
-  document.addEventListener('click', (event) => {
-    const searchBox = document.querySelector('.search-box');
-    const suggestionsList = document.getElementById('suggestions');
-    if (!searchBox.contains(event.target)) {
-      suggestionsList.style.display = 'none';
+  async function addUserContact(username) {
+    try {
+      await fetch(`${API}/chat/one-to-one/contacts`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contact: username })
+      });
+      
+      document.getElementById("userSearch").value = "";
+      document.getElementById("suggestions").style.display = 'none';
+      await loadContacts();
+      selectUser(username);
+    } catch (err) {
+      console.error("Add contact error:", err);
+    }
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-box')) {
+      document.getElementById('suggestions').style.display = 'none';
     }
   });
 
