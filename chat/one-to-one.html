@@ -241,31 +241,30 @@
     const ul = document.getElementById("suggestions");
     ul.innerHTML = `
       <li class="text-muted px-2 py-1">
-        <div class="d-flex align-items-center">
-          <i class="fas fa-spinner fa-spin me-2"></i>
-          <span>Finding users...</span>
-        </div>
+        <i class="fas fa-spinner fa-spin me-2"></i>
+        Searching for users...
       </li>`;
     ul.style.display = 'block';
 
     try {
-      const res = await fetch(`${API}/users/search?username=${encodeURIComponent(query)}`, {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
+      const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, {
+        credentials: 'include'
       });
       
       if (!res.ok) {
-        console.log("Search API response:", res.status, res);
-        throw new Error(`Search failed with status ${res.status}`);
+        const errorText = await res.text();
+        console.error("Search API error:", res.status, errorText);
+        throw new Error(errorText || "Search failed");
       }
-      const data = await res.json();
-      const users = data.data || [];
+      
+      const users = await res.json();
 
       if (!users || !users.length) {
-        ul.innerHTML = `<li class="text-muted">No users found</li>`;
+        ul.innerHTML = `
+          <li class="text-muted px-2 py-1">
+            <i class="fas fa-user-times me-2"></i>
+            No users match your search
+          </li>`;
         return;
       }
 
@@ -295,11 +294,11 @@
       console.error("Search error:", err);
       ul.innerHTML = `
         <li class="text-muted px-2 py-1">
-          <i class="fas fa-wifi-slash me-2"></i>
-          Please check your connection
+          <i class="fas fa-search me-2"></i>
+          Couldn't load suggestions
         </li>
-        <li class="text-muted px-2 py-1">
-          <small>Search unavailable temporarily</small>
+        <li class="text-muted px-2 py-1 text-small">
+          Try refreshing the page
         </li>`;
       setTimeout(() => ul.style.display = 'none', 3000);
     }
