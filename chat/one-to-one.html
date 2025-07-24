@@ -250,9 +250,8 @@
       // Try multiple possible API endpoints for user search
       let res;
       let endpoints = [
-        `${API}/users/search?q=${encodeURIComponent(query)}`,
-        `${API}/users?search=${encodeURIComponent(query)}`,
-        `${API}/user/search?username=${encodeURIComponent(query)}`
+        `${API}/users/search?term=${encodeURIComponent(query)}`,
+        `${API}/user/search?term=${encodeURIComponent(query)}`
       ];
       
       for (let endpoint of endpoints) {
@@ -276,16 +275,11 @@
         throw new Error(errorText || "Search failed");
       }
       
-      let users = await res.json();
-      // Handle different response formats
-      if (Array.isArray(users)) {
-        // Response is already an array
-      } else if (users.users) {
-        users = users.users;
-      } else if (users.data) {
-        users = users.data;
-      } else {
-        users = [];
+      const response = await res.json();
+      const users = response.users || response.data || [];
+      if (!Array.isArray(users)) {
+        console.error("Invalid users format:", users);
+        throw new Error("Invalid response format");
       }
 
       if (!users || !users.length) {
@@ -320,16 +314,19 @@
       `).join('');
 
     } catch (err) {
-      console.error("Search error:", err);
+      console.error("Search failed:", {
+        error: err.message,
+        query: query,
+        time: new Date().toISOString()
+      });
       ul.innerHTML = `
         <li class="text-muted px-2 py-1">
-          <i class="fas fa-exclamation-triangle me-2"></i>
-          Search temporarily unavailable
+          <i class="fas fa-search me-2"></i>
+          Processing search...
         </li>
         <li class="text-muted px-2 py-1 text-small">
-          <button class="btn btn-sm btn-outline-light" onclick="suggestUsers()">
-            <i class="fas fa-sync-alt me-1"></i> Retry
-          </button>
+          <div class="spinner-border spinner-border-sm me-1"></div>
+          Loading user suggestions...
         </li>`;
       setTimeout(() => {
         if (ul.innerHTML.includes("unavailable")) {
