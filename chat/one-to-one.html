@@ -241,26 +241,22 @@
     const ul = document.getElementById("suggestions");
     ul.innerHTML = `
       <li class="text-muted">
-        <i class="fa fa-spinner fa-spin"></i>
-        Searching users...
+        <i class="fas fa-spinner fa-spin me-2"></i>
+        Loading user suggestions...
       </li>`;
     ul.style.display = 'block';
 
     try {
-      // First try the correct backend endpoint
-      let res = await fetch(`${API}/users/search?q=${encodeURIComponent(query)}`, {
-        credentials: 'include'
+      const res = await fetch(`${API}/user/search-users?q=${encodeURIComponent(query)}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
       
-      // Fallback to alternative endpoint if first fails
-      if (!res.ok) {
-        res = await fetch(`${API}/user/search?q=${encodeURIComponent(query)}`, {
-          credentials: 'include'  
-        });
-      }
-      if (!res.ok) throw new Error('Failed to fetch users');
-      const data = await res.json();
-      const users = data.users || [];
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const users = await res.json();
 
       if (!users || !users.length) {
         ul.innerHTML = `<li class="text-muted">No users found</li>`;
@@ -292,15 +288,13 @@
     } catch (err) {
       console.error("Search error:", err);
       ul.innerHTML = `
-        <li class="text-danger">
-          <i class="fas fa-exclamation-triangle me-2"></i>
-          Search service unavailable
+        <li class="text-muted">
+          <i class="fas fa-info-circle me-2"></i>
+          Could not load suggestions. Try again later.
         </li>`;
       setTimeout(() => {
-        if (ul.innerHTML.includes("unavailable")) {
-          ul.style.display = 'none';
-        }
-      }, 3000);
+        ul.style.display = 'none';
+      }, 2000);
     }
   }
 
