@@ -243,17 +243,24 @@
     ul.style.display = 'block';
 
     try {
-      const res = await fetch(`${API}/users/search?username=${encodeURIComponent(query)}`, {
-        credentials: 'include'
+      const res = await fetch(`${API}/users/search-users?q=${encodeURIComponent(query)}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json' 
+        }
       });
       
       if (!res.ok) {
-        console.log("Search response:", res.status, res);
-        throw new Error('Failed to fetch users');
+        const error = await res.text();
+        console.error("Search API error:", res.status, error);
+        throw new Error(error || "Search failed");
       }
       
-      const data = await res.json();
-      const users = data.users || data.data || [];
+      const response = await res.json();
+      const users = Array.isArray(response) ? response : 
+                  response.users ? response.users :
+                  response.data ? response.data : [];
 
       if (!users || !users.length) {
         ul.innerHTML = `
@@ -287,25 +294,16 @@
       `).join('');
 
     } catch (err) {
-      console.error("Search failed:", {
-        error: err.message,
-        query: query,
-        time: new Date().toISOString()
-      });
+      console.error("Search error:", err);
       ul.innerHTML = `
         <li class="text-muted px-2 py-1">
-          <i class="fas fa-search me-2"></i>
-          Processing search...
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          Could not load suggestions
         </li>
-        <li class="text-muted px-2 py-1 text-small">
-          <div class="spinner-border spinner-border-sm me-1"></div>
-          Loading user suggestions...
+        <li class="text-muted px-2 py-1">
+          <small>Please try again later</small>
         </li>`;
-      setTimeout(() => {
-        if (ul.innerHTML.includes("unavailable")) {
-          ul.style.display = 'none';
-        }
-      }, 5000);
+      setTimeout(() => ul.style.display = 'none', 3000);
     }
   }
 
