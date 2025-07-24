@@ -232,60 +232,95 @@
 
   async function suggestUsers() {
     const query = document.getElementById("userSearch").value.trim();
-    const ul = document.getElementById("suggestions");
-    ul.innerHTML = "";
     if (!query) {
-      ul.style.display = 'none'; 
+      document.getElementById("suggestions").style.display = 'none';
+      document.getElementById("suggestions").innerHTML = "";
       return;
     }
+
+    const ul = document.getElementById("suggestions");
+    ul.innerHTML = `
+      <li class="text-muted">
+        <i class="fa fa-spinner fa-spin"></i>
+        Searching users...
+      </li>`;
     ul.style.display = 'block';
-    ul.innerHTML = `<li class="text-muted">Loading...</li>`;
 
     try {
-      const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, { 
-        credentials: 'include' 
+      // First try the correct backend endpoint
+      let res = await fetch(`${API}/users/search?q=${encodeURIComponent(query)}`, {
+        credentials: 'include'
       });
-      if (!res.ok) throw new Error('Failed to fetch');
-      const users = await res.json();
+      
+      // Fallback to alternative endpoint if first fails
+      if (!res.ok) {
+        res = await fetch(`${API}/user/search?q=${encodeURIComponent(query)}`, {
+          credentials: 'include'  
+        });
+      }
+      if (!res.ok) throw new Error('Failed to fetch users');
+      const data = await res.json();
+      const users = data.users || [];
 
       if (!users || !users.length) {
         ul.innerHTML = `<li class="text-muted">No users found</li>`;
         return;
       }
 
-      const filtered = users.filter(u => {
-        return u.username && 
-               u.username !== username && 
-               !contacts.some(c => c.username === u.username);
-      }).slice(0, 5);
+      const filtered = users.filter(u => 
+        u.username && 
+        u.username !== username && 
+        !contacts.some(c => c.username === u.username)
+      ).slice(0, 5);
 
       if (!filtered.length) {
-        ul.innerHTML = `<li class="text-muted">No matching contacts</li>`;
+        ul.innerHTML = `
+          <li class="text-muted">
+            <i class="fas fa-user-slash"></i>
+            No matching users found
+          </li>`;
         return;
       }
 
       ul.innerHTML = filtered.map(u => `
-        <li onclick="addUserContact('${u.username}')">
+        <li onclick="addUserContact('${u.username}')" class="p-2">
+          <i class="fas fa-user-plus me-2"></i>
           ${u.username}
         </li>
       `).join('');
 
     } catch (err) {
       console.error("Search error:", err);
-      ul.innerHTML = `<li class="text-danger">Connection error</li>`;
+      ul.innerHTML = `
+        <li class="text-danger">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          Search service unavailable
+        </li>`;
+      setTimeout(() => {
+        if (ul.innerHTML.includes("unavailable")) {
+          ul.style.display = 'none';
+        }
+      }, 3000);
     }
   }
 
   async function addUserContact(username) {
     try {
-      await fetch(`${API}/chat/one-to-one/contacts`, {
+      const res = await fetch(`${API}/chat/one-to-one/contacts`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contact: username })
       });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
       
-      document.getElementById("userSearch").value = "";
+      // Clear search and hide dropdown
+      const searchInput = document.getElementById("userSearch");
+      searchInput.value = "";
+      searchInput.blur();
       document.getElementById("suggestions").style.display = 'none';
       await loadContacts();
       selectUser(username);
