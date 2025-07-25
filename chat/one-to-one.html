@@ -1,4 +1,3 @@
-<!-- START OF UPDATED one-to-one.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,6 +19,7 @@
     .user-item { padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
     .user-item.active { background: #475569; }
     .user-item:hover { background: #334155; }
+    .new-msg-dot { color: #facc15; font-size: 1.2rem; line-height: 1; }
     .chat-main { flex: 1; display: flex; flex-direction: column; background: #111827; }
     .chat-header { padding: 0.75rem 1rem; background: #1e293b; border-bottom: 1px solid #334155; font-weight: bold; font-size: 1.1rem; }
     .message-box { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; }
@@ -30,7 +30,6 @@
     .input-area input { flex: 1; padding: 0.5rem; margin-right: 0.5rem; border-radius: 8px; border: none; background: #374151; color: #fff; }
     .input-area button { background: #facc15; color: #000; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: bold; }
     .input-area button:hover { background: #fde047; }
-    .unread-badge { color: #facc15; font-size: 1rem; margin-left: 6px; }
   </style>
 </head>
 <body>
@@ -69,12 +68,13 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
 const API = "https://campusverse-backend.onrender.com/api";
 let username, contacts = [], selectedUser = null;
 let highlightedIndex = -1, poll;
 let isTyping = false, isSearching = false;
-let lastMessageTimestamps = {};
+let unseenMap = {};
 
 async function init() {
   const res = await fetch(`${API}/auth/user`, { credentials:'include' });
@@ -90,12 +90,12 @@ async function init() {
 }
 
 function logout(){
-  fetch(`${API}/auth/logout`,{credentials:'include'})
+  fetch(`${API}/auth/logout`, { credentials:'include' })
     .then(()=>location.href="../login.html");
 }
 
 async function loadContacts(){
-  const res = await fetch(`${API}/chat/one-to-one/contacts`,{credentials:'include'});
+  const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials:'include' });
   contacts = res.ok ? await res.json() : [];
   renderContacts();
 }
@@ -108,12 +108,17 @@ function renderContacts(){
   contacts.forEach(c => {
     const div = document.createElement("div");
     div.className = "user-item" + (c.username === selectedUser ? " active" : "");
-    const unread = c.lastMessage && c.lastMessage.sender !== username &&
-                   (!selectedUser || selectedUser !== c.username);
-    div.innerHTML = `
-      <span>${c.username}</span>
-      ${unread ? '<span class="unread-badge">●</span>' : ''}
-    `;
+    const span = document.createElement("span");
+    span.textContent = c.username;
+
+    const badge = document.createElement("span");
+    if (unseenMap[c.username] && c.username !== selectedUser) {
+      badge.className = "new-msg-dot";
+      badge.textContent = "●";
+    }
+
+    div.appendChild(span);
+    if (badge.textContent) div.appendChild(badge);
     div.onclick = () => selectUser(c.username);
     list.appendChild(div);
   });
@@ -147,14 +152,14 @@ document.addEventListener("click", e => {
     suggestionList.style.display = "none";
 });
 
-async function suggestUsers() {
+async function suggestUsers(){
   const q = searchInput.value.trim();
   suggestionList.innerHTML = "";
   if (!q) return suggestionList.style.display = "none";
   const res = await fetch(`${API}/users?search=${encodeURIComponent(q)}`, { credentials:'include' });
   const users = res.ok ? await res.json() : [];
   const filtered = users.filter(u => u.username !== username && !contacts.some(c => c.username === u.username)).slice(0, 5);
-  if (!filtered.length) {
+  if (!filtered.length){
     suggestionList.innerHTML = "<li class='text-muted'>No matches found</li>";
   } else {
     filtered.forEach(u => {
@@ -163,6 +168,7 @@ async function suggestUsers() {
       li.onclick = async () => {
         if (!contacts.some(c => c.username === u.username)) {
           contacts.push({ username: u.username });
+          unseenMap[u.username] = false;
           renderContacts();
         }
         selectUser(u.username);
@@ -176,27 +182,37 @@ async function suggestUsers() {
   highlightedIndex = -1;
 }
 
-function startPolling() {
+function startPolling(){
   const tick = async () => {
     if (!isTyping && !isSearching) {
       await loadContacts();
+      await checkUnseenMessages();
       if (selectedUser) await fetchAndRender();
     }
   };
   tick();
-  poll = setInterval(tick, 2000);
+  poll = setInterval(tick, 3000);
 }
 
-async function selectUser(name) {
+async function checkUnseenMessages(){
+  const res = await fetch(`${API}/chat/one-to-one/unseen`, { credentials: 'include' });
+  const unseen = res.ok ? await res.json() : [];
+  unseenMap = {};
+  unseen.forEach(u => unseenMap[u.from] = true);
+  renderContacts();
+}
+
+async function selectUser(name){
   selectedUser = name;
+  unseenMap[name] = false;
   document.getElementById("chatHeader").textContent = `Chatting with: ${name}`;
   renderContacts();
   document.getElementById("chatMessages").innerHTML = `<p class="text-center text-muted">Loading messages…</p>`;
   await fetchAndRender();
 }
 
-async function fetchAndRender() {
-  const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials: 'include' });
+async function fetchAndRender(){
+  const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials:'include' });
   const msgs = res.ok ? await res.json() : [];
   const box = document.getElementById("chatMessages");
   box.innerHTML = msgs.map(m =>
@@ -204,12 +220,11 @@ async function fetchAndRender() {
       <div class="text-end text-muted" style="font-size:0.75rem;">
         ${new Date(m.createdAt).toLocaleTimeString()}
       </div>
-    </div>`
-  ).join("");
+    </div>`).join("");
   box.scrollTop = box.scrollHeight;
 }
 
-async function sendMessage() {
+async function sendMessage(){
   const input = document.getElementById("chatInput");
   const txt = input.value.trim();
   if (!txt || !selectedUser) return;
@@ -233,4 +248,3 @@ window.addEventListener("DOMContentLoaded", init);
 </script>
 </body>
 </html>
-<!-- END OF UPDATED one-to-one.html -->
