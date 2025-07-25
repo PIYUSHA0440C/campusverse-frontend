@@ -202,12 +202,15 @@
 
     // Call logout endpoint then refresh navbar & redirect
     async function logout() {
-      await fetch(`${API_BASE}/auth/logout`, {
-        credentials: "include"
-      });
-      await updateNavbar();
-      setTimeout(() => window.location.href = "login.html", 300);
-    }
+  await fetch(`${API_BASE}/auth/logout`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store'
+  });
+  await updateNavbar();
+  window.location.href = 'login.html'; // Redirect after full reset
+}
+
 
     window.addEventListener("DOMContentLoaded", updateNavbar);
   </script>
