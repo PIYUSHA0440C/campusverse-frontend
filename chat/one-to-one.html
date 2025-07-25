@@ -213,19 +213,13 @@ function resumePolling() {
 
 async function fetchAndRender() {
   if (!selectedUser || isTyping || isSearching) return;
+
+  // ← NEW: refresh contact list each poll so newcomers get added immediately
+  await loadContacts();
+
   try {
     const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials: 'include' });
     const msgs = res.ok ? await res.json() : [];
-
-    // **Automatically add any new sender into contacts**
-    msgs.forEach(m => {
-      const other = m.sender.username;
-      if (other !== username && !contacts.some(c => c.username === other)) {
-        contacts.push({ username: other });
-        renderContacts();
-      }
-    });
-
     const box = document.getElementById("chatMessages");
     box.innerHTML = msgs.map(m => `
       <div class="message ${m.sender.username === username ? "sent" : "received"}">
