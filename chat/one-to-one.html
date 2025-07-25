@@ -17,10 +17,9 @@
     .suggestions li { padding: 0.4rem 0.6rem; cursor: pointer; color: #f8fafc; border-bottom: 1px solid #334155; }
     .suggestions li:last-child { border-bottom: none; }
     .suggestions li:hover, .suggestions li.active { background: #475569; }
-    .user-item { position: relative; padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; cursor: pointer; }
+    .user-item { padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; cursor: pointer; }
     .user-item.active { background: #475569; }
     .user-item:hover { background: #334155; }
-    .user-item .badge { position: absolute; top: 8px; right: 12px; background: #facc15; color: #000; font-size: 0.65rem; }
     .chat-main { flex: 1; display: flex; flex-direction: column; background: #111827; }
     .chat-header { padding: 0.75rem 1rem; background: #1e293b; border-bottom: 1px solid #334155; font-weight: bold; font-size: 1.1rem; }
     .message-box { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; }
@@ -36,7 +35,9 @@
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
   <div class="container-fluid">
-    <a class="navbar-brand text-warning" href="../index.html"><i class="fas fa-user-graduate me-2"></i>CampusVerse</a>
+    <a class="navbar-brand text-warning" href="../index.html">
+      <i class="fas fa-user-graduate me-2"></i>CampusVerse
+    </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
       <span class="navbar-toggler-icon"></span>
     </button>
@@ -75,56 +76,40 @@ let username, contacts = [], selectedUser = null;
 let highlightedIndex = -1, poll;
 let isTyping = false, isSearching = false;
 
-// track last seen timestamp per contact
-const lastSeen = {};      // { username: Date }
-const unreadCount = {};   // { username: number }
-
 async function init() {
-  const res = await fetch(`${API}/auth/user`, { credentials: 'include' });
-  if (!res.ok) return location.href = "../login.html";
+  const res = await fetch(`${API}/auth/user`, { credentials:'include' });
+  if (!res.ok) return location.href="../login.html";
   const user = await res.json();
   username = user.username;
   document.getElementById("nav-user-area").innerHTML = `
     <li class="nav-item"><a class="nav-link" href="../profile.html">👤 ${username}</a></li>
     <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>`;
-  document.getElementById("chatContainer").style.display = "flex";
+  document.getElementById("chatContainer").style.display="flex";
   await loadContacts();
   startPolling();
 }
 
-function logout() {
-  fetch(`${API}/auth/logout`, { credentials: 'include' })
-    .then(() => location.href = "../login.html");
+function logout(){
+  fetch(`${API}/auth/logout`,{credentials:'include'})
+    .then(()=>location.href="../login.html");
 }
 
-async function loadContacts() {
-  const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials: 'include' });
-  contacts = res.ok ? await res.json() : [];
-  contacts.forEach(u => {
-    if (!lastSeen[u.username]) lastSeen[u.username] = new Date(0);
-    if (!unreadCount[u.username]) unreadCount[u.username] = 0;
-  });
+async function loadContacts(){
+  const res = await fetch(`${API}/chat/one-to-one/contacts`,{credentials:'include'});
+  contacts = res.ok?await res.json():[];
   renderContacts();
 }
 
-function renderContacts() {
-  const list = document.getElementById("contactList");
+function renderContacts(){
+  const list=document.getElementById("contactList");
   list.innerHTML = contacts.length
     ? ""
     : `<p class="text-muted text-center mt-3">No contacts yet. Search above to add!</p>`;
-  contacts.forEach(c => {
-    const div = document.createElement("div");
-    div.className = "user-item" + (c.username === selectedUser ? " active" : "");
-    div.textContent = c.username;
-    // attach badge if unseen
-    const cnt = unreadCount[c.username] || 0;
-    if (cnt > 0) {
-      const badge = document.createElement("span");
-      badge.className = "badge";
-      badge.textContent = cnt;
-      div.appendChild(badge);
-    }
-    div.onclick = () => selectUser(c.username);
+  contacts.forEach(c=>{
+    const div=document.createElement("div");
+    div.className="user-item"+(c.username===selectedUser?" active":"");
+    div.textContent=c.username;
+    div.onclick=()=>selectUser(c.username);
     list.appendChild(div);
   });
 }
@@ -134,136 +119,117 @@ function renderContacts() {
 const searchInput = document.getElementById("userSearch");
 const suggestionList = document.getElementById("suggestions");
 
-searchInput.addEventListener("input", () => {
+searchInput.addEventListener("input",()=>{
   clearTimeout(poll);
   isSearching = true;
-  setTimeout(async () => {
+  setTimeout(async()=>{
     await suggestUsers();
     isSearching = false;
-  }, 300);
+  },300);
 });
 
-searchInput.addEventListener("keydown", e => {
-  const items = Array.from(suggestionList.children);
-  if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) {
+searchInput.addEventListener("keydown",e=>{
+  const items=Array.from(suggestionList.children);
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"||e.key==="Enter"){
     e.preventDefault();
-    if (e.key === "ArrowDown") highlightedIndex = (highlightedIndex + 1) % items.length;
-    if (e.key === "ArrowUp") highlightedIndex = (highlightedIndex - 1 + items.length) % items.length;
-    if (e.key === "Enter" && highlightedIndex >= 0) items[highlightedIndex].click();
-    items.forEach((li,i) => li.classList.toggle("active", i === highlightedIndex));
+    if(e.key==="ArrowDown") highlightedIndex=(highlightedIndex+1)%items.length;
+    if(e.key==="ArrowUp") highlightedIndex=(highlightedIndex-1+items.length)%items.length;
+    if(e.key==="Enter"&&highlightedIndex>=0) items[highlightedIndex].click();
+    items.forEach((li,i)=>li.classList.toggle("active",i===highlightedIndex));
   }
 });
 
-document.addEventListener("click", e => {
-  if (!document.querySelector(".search-box").contains(e.target))
-    suggestionList.style.display = "none";
+document.addEventListener("click",e=>{
+  if(!document.querySelector(".search-box").contains(e.target))
+    suggestionList.style.display="none";
 });
 
-async function suggestUsers() {
-  const q = searchInput.value.trim();
-  suggestionList.innerHTML = "";
-  if (!q) return suggestionList.style.display = "none";
-  const res = await fetch(`${API}/users?search=${encodeURIComponent(q)}`, { credentials: 'include' });
-  const users = res.ok ? await res.json() : [];
-  const filtered = users.filter(u => u.username !== username && !contacts.some(c => c.username === u.username)).slice(0,5);
-  if (!filtered.length) {
-    suggestionList.innerHTML = "<li class='text-muted'>No matches found</li>";
+async function suggestUsers(){
+  const q=searchInput.value.trim();
+  suggestionList.innerHTML="";
+  if(!q) return suggestionList.style.display="none";
+  const res=await fetch(`${API}/users?search=${encodeURIComponent(q)}`,{credentials:'include'});
+  const users=res.ok?await res.json():[];
+  const filtered=users.filter(u=>u.username!==username && !contacts.some(c=>c.username===u.username)).slice(0,5);
+  if(!filtered.length){
+    suggestionList.innerHTML="<li class='text-muted'>No matches found</li>";
   } else {
-    filtered.forEach(u => {
-      const li = document.createElement("li");
-      li.textContent = u.username;
-      li.onclick = async () => {
-        if (!contacts.some(c => c.username === u.username)) {
-          contacts.push({ username: u.username });
-          lastSeen[u.username] = new Date(0);
-          unreadCount[u.username] = 0;
+    filtered.forEach(u=>{
+      const li=document.createElement("li");
+      li.textContent=u.username;
+      li.onclick=async()=>{
+        if(!contacts.some(c=>c.username===u.username)){
+          contacts.push({username:u.username});
           renderContacts();
         }
         selectUser(u.username);
-        searchInput.value = "";
-        suggestionList.style.display = "none";
+        searchInput.value="";
+        suggestionList.style.display="none";
       };
       suggestionList.appendChild(li);
     });
   }
-  suggestionList.style.display = "block";
-  highlightedIndex = -1;
+  suggestionList.style.display="block";
+  highlightedIndex=-1;
 }
 
 /* ─────────── Polling (contacts + messages) ─────────── */
 
-function startPolling() {
-  const tick = async () => {
-    if (!isTyping && !isSearching) {
+function startPolling(){
+  const tick = async()=>{
+    if(!isTyping && !isSearching){
       await loadContacts();
-      if (selectedUser) await fetchAndRender();
+      if(selectedUser) await fetchAndRender();
     }
   };
   tick();
-  poll = setInterval(tick, 1000);  // 🔥 faster updates
+  poll=setInterval(tick,3000);
 }
 
 /* ─────────── Messages ─────────── */
 
-async function selectUser(name) {
-  selectedUser = name;
-  document.getElementById("chatHeader").textContent = `Chatting with: ${name}`;
-  unreadCount[name] = 0;                // reset unread on open
-  lastSeen[name] = new Date();          // mark as seen now
+async function selectUser(name){
+  selectedUser=name;
+  document.getElementById("chatHeader").textContent=`Chatting with: ${name}`;
   renderContacts();
-  document.getElementById("chatMessages").innerHTML = `<p class="text-center text-muted">Loading messages…</p>`;
+  document.getElementById("chatMessages").innerHTML=`<p class="text-center text-muted">Loading messages…</p>`;
   await fetchAndRender();
 }
 
-async function fetchAndRender() {
-  if (!selectedUser) return;
-  const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials: 'include' });
-  const msgs = res.ok ? await res.json() : [];
-  const box = document.getElementById("chatMessages");
-  box.innerHTML = msgs.map(m => `
-    <div class="message ${m.sender.username === username ? "sent" : "received"}">
-      ${m.text}
-      <div class="text-end text-muted" style="font-size: 0.75rem;">
+async function fetchAndRender(){
+  const res=await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`,{credentials:'include'});
+  const msgs=res.ok?await res.json():[];
+  const box=document.getElementById("chatMessages");
+  box.innerHTML=msgs.map(m=>
+    `<div class="message ${m.sender.username===username?"sent":"received"}">${m.text}
+      <div class="text-end text-muted" style="font-size:0.75rem;">
         ${new Date(m.createdAt).toLocaleTimeString()}
       </div>
     </div>`).join("");
-  box.scrollTop = box.scrollHeight;
-
-  // count any new ones
-  msgs.forEach(m => {
-    const from = m.sender.username;
-    const created = new Date(m.createdAt);
-    if (from !== username && created > lastSeen[from]) {
-      unreadCount[from] = (unreadCount[from] || 0) + 1;
-    }
-  });
-  renderContacts();
+  box.scrollTop=box.scrollHeight;
 }
 
-async function sendMessage() {
-  const input = document.getElementById("chatInput");
-  const txt = input.value.trim();
-  if (!txt || !selectedUser) return;
-  await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, {
-    method: "POST", credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: txt })
+async function sendMessage(){
+  const input=document.getElementById("chatInput");
+  const txt=input.value.trim();
+  if(!txt||!selectedUser) return;
+  await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`,{
+    method:"POST",credentials:"include",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({text:txt})
   });
-  input.value = "";
-  // reset unread for this conversation
-  unreadCount[selectedUser] = 0;
-  lastSeen[selectedUser] = new Date();
+  input.value="";
   await fetchAndRender();
 }
 
-document.getElementById("sendBtn").addEventListener("click", sendMessage);
-document.getElementById("chatInput").addEventListener("focus", ()=> isTyping = true);
-document.getElementById("chatInput").addEventListener("blur", ()=> isTyping = false);
-document.getElementById("chatInput").addEventListener("keydown", e=>{
-  if (e.key === "Enter") sendMessage();
+document.getElementById("sendBtn").addEventListener("click",sendMessage);
+document.getElementById("chatInput").addEventListener("focus",()=>isTyping=true);
+document.getElementById("chatInput").addEventListener("blur",()=>isTyping=false);
+document.getElementById("chatInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter")sendMessage();
 });
 
-window.addEventListener("DOMContentLoaded", init);
+window.addEventListener("DOMContentLoaded",init);
 </script>
 </body>
 </html>
