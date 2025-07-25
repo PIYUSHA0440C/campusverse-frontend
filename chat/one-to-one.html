@@ -168,6 +168,7 @@ function selectUser(name) {
   poll = setInterval(fetchAndRender, 3000);
 }
 
+// ✅ Updated function to immediately show new users in contact panel
 async function fetchAndRender() {
   if (!selectedUser) return;
   const res = await fetch(`${API}/chat/one-to-one/${selectedUser}`, { credentials: 'include' });
@@ -179,13 +180,15 @@ async function fetchAndRender() {
     </div>`).join("");
   box.scrollTop = box.scrollHeight;
 
+  let changed = false;
   messages.forEach(m => {
     const otherUser = m.sender.username === username ? m.receiver.username : m.sender.username;
     if (!contacts.some(c => c.username === otherUser)) {
       contacts.push({ username: otherUser });
-      renderContacts();
+      changed = true;
     }
   });
+  if (changed) renderContacts();
 }
 
 async function sendMessage() {
