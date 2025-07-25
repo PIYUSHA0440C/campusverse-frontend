@@ -41,7 +41,7 @@
       margin-bottom:0.25rem;
     }
     .you .sender {
-      color:#fff;         /* your own name: white */
+      color:#1e40af;      /* your own name: deep navy for contrast */
     }
 
     .meta {
@@ -52,14 +52,14 @@
     }
 
     .new-indicator {
-      text-align: center;
-      margin: 0.5rem 0;
-      padding: 0.25rem 0.5rem;
-      background: #facc15;
-      color: #000;
-      border-radius: 12px;
-      font-size: 0.85rem;
-      flex-shrink: 0;
+      text-align:center;
+      margin:0.5rem 0;
+      padding:0.25rem 0.5rem;
+      background:#facc15;
+      color:#000;
+      border-radius:12px;
+      font-size:0.85rem;
+      flex-shrink:0;
     }
 
     .chat-footer {
@@ -153,10 +153,8 @@
         if (!res.ok) throw new Error('Group fetch failed');
         const msgs = await res.json();
 
-        // Detect if user is at bottom
         const atBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 5;
 
-        // Build HTML with "New messages" indicator if scrolled up
         let html = '';
         const newCount = msgs.length - prevLen;
         msgs.forEach((m, i) => {
