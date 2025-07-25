@@ -1,3 +1,4 @@
+<!-- one-to-one.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -64,12 +65,10 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const API = "https://campusverse-backend.onrender.com/api";
-let username, contacts = [], selectedUser = null;
-let isTyping = false, isSearching = false, poll;
-let highlightedIndex = -1;
+let username, contacts = [], selectedUser = null, poll;
+let isTyping = false, isSearching = false;
 
 async function init() {
   try {
@@ -96,10 +95,10 @@ async function loadContacts() {
   try {
     const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials: 'include' });
     contacts = res.ok ? await res.json() : [];
+    renderContacts();
   } catch {
     contacts = [];
   }
-  renderContacts();
 }
 
 function renderContacts() {
@@ -116,80 +115,34 @@ function renderContacts() {
   });
 }
 
-let searchTimer;
-const searchInput = document.getElementById("userSearch");
-const suggestionList = document.getElementById("suggestions");
-
-searchInput.addEventListener("input", () => {
-  clearTimeout(searchTimer);
-  isSearching = true;
-  searchTimer = setTimeout(() => {
-    suggestUsers();
-    isSearching = false;
-  }, 300);
-  highlightedIndex = -1;
-});
-
-searchInput.addEventListener("keydown", (e) => {
-  const items = Array.from(suggestionList.children);
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    highlightedIndex = (highlightedIndex + 1) % items.length;
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    highlightedIndex = (highlightedIndex - 1 + items.length) % items.length;
-  } else if (e.key === "Enter" && highlightedIndex > -1) {
-    e.preventDefault();
-    items[highlightedIndex]?.click();
-    return;
-  } else {
-    return;
-  }
-  items.forEach((li, i) => li.classList.toggle("active", i === highlightedIndex));
-});
-
-async function suggestUsers() {
-  const query = searchInput.value.trim();
-  suggestionList.innerHTML = "";
-  if (!query) return suggestionList.style.display = 'none';
-  suggestionList.style.display = 'block';
+document.getElementById("userSearch").addEventListener("input", async e => {
+  const query = e.target.value.trim();
+  const list = document.getElementById("suggestions");
+  list.innerHTML = "";
+  if (!query) return;
   try {
     const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, { credentials: 'include' });
     const users = res.ok ? await res.json() : [];
-    const filtered = users
-      .filter(u => u.username !== username && !contacts.some(c => c.username === u.username))
-      .slice(0, 5);
-    if (filtered.length === 0) return suggestionList.innerHTML = `<li class="text-muted">No matches found</li>`;
+    const filtered = users.filter(u =>
+      u.username !== username &&
+      !contacts.some(c => c.username === u.username)
+    ).slice(0, 5);
     filtered.forEach(u => {
       const li = document.createElement("li");
       li.textContent = u.username;
       li.onclick = async () => {
-        pausePolling();
-        const addRes = await fetch(`${API}/chat/one-to-one/contacts`, {
-          method: "POST", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contact: u.username })
-        });
-        if (addRes.ok && !contacts.some(c => c.username === u.username)) {
+        if (!contacts.some(c => c.username === u.username)) {
           contacts.push({ username: u.username });
           renderContacts();
         }
         selectUser(u.username);
-        searchInput.value = "";
-        suggestionList.style.display = 'none';
-        resumePolling();
+        list.innerHTML = "";
+        document.getElementById("userSearch").value = "";
       };
-      suggestionList.appendChild(li);
+      list.appendChild(li);
     });
-  } catch (err) {
-    console.error(err);
-    suggestionList.innerHTML = `<li class="text-danger">Error fetching users</li>`;
-  }
-}
-
-document.addEventListener('click', (e) => {
-  if (!document.querySelector('.search-box').contains(e.target)) {
-    suggestionList.style.display = 'none';
+  } catch {
+    list.innerHTML = `<li class="text-danger">Error fetching</li>`;
   }
 });
 
@@ -206,10 +159,6 @@ function startPolling() {
   fetchAndRender();
   poll = setInterval(fetchAndRender, 3000);
 }
-function pausePolling() { clearInterval(poll); }
-function resumePolling() {
-  if (selectedUser && !isTyping && !isSearching) startPolling();
-}
 
 async function fetchAndRender() {
   if (!selectedUser || isTyping || isSearching) return;
@@ -224,19 +173,13 @@ async function fetchAndRender() {
           ${new Date(m.createdAt).toLocaleTimeString()}
         </div>
       </div>`).join("");
+
+    if (msgs.length && !contacts.some(c => c.username === selectedUser)) {
+      contacts.push({ username: selectedUser });
+      renderContacts();
+    }
+
     box.scrollTop = box.scrollHeight;
-
-    // ✅ Add unknown user only if THEY send message
-    msgs.forEach(m => {
-      if (m.sender.username !== username) {
-        const exists = contacts.some(c => c.username === m.sender.username);
-        if (!exists) {
-          contacts.push({ username: m.sender.username });
-          renderContacts();
-        }
-      }
-    });
-
   } catch (err) {
     console.error("Fetch error:", err);
   }
@@ -254,10 +197,11 @@ async function sendMessage() {
     });
     if (res.ok) {
       input.value = "";
-      isTyping = false;
+      if (!contacts.some(c => c.username === selectedUser)) {
+        contacts.push({ username: selectedUser });
+        renderContacts();
+      }
       fetchAndRender();
-    } else {
-      alert("Failed to send message.");
     }
   } catch {
     alert("Error sending message.");
@@ -265,20 +209,9 @@ async function sendMessage() {
 }
 
 const inp = document.getElementById("chatInput");
-inp.addEventListener("keydown", e => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    sendMessage();
-  }
-});
-inp.addEventListener("focus", () => { isTyping = true; pausePolling(); });
-inp.addEventListener("blur", () => { isTyping = false; resumePolling(); });
-inp.addEventListener("input", () => {
-  if (!inp.value.trim()) {
-    isTyping = false;
-    fetchAndRender();
-  }
-});
+inp.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
+inp.addEventListener("focus", () => { isTyping = true; clearInterval(poll); });
+inp.addEventListener("blur", () => { isTyping = false; startPolling(); });
 
 document.getElementById("sendBtn").addEventListener("click", sendMessage);
 window.addEventListener("DOMContentLoaded", init);
