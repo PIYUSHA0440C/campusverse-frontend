@@ -96,10 +96,10 @@ async function loadContacts() {
   try {
     const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials: 'include' });
     contacts = res.ok ? await res.json() : [];
-    renderContacts();
   } catch {
     contacts = [];
   }
+  renderContacts();
 }
 
 function renderContacts() {
@@ -164,22 +164,25 @@ async function suggestUsers() {
       const li = document.createElement("li");
       li.textContent = u.username;
       li.onclick = async () => {
+        pausePolling();
         const addRes = await fetch(`${API}/chat/one-to-one/contacts`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contact: u.username })
         });
-        if (addRes.ok) {
+        if (addRes.ok && !contacts.some(c => c.username === u.username)) {
           contacts.push({ username: u.username });
           renderContacts();
-          selectUser(u.username);
         }
+        selectUser(u.username);
         searchInput.value = "";
         suggestionList.style.display = 'none';
+        resumePolling();
       };
       suggestionList.appendChild(li);
     });
-  } catch {
+  } catch (err) {
+    console.error(err);
     suggestionList.innerHTML = `<li class="text-danger">Error fetching users</li>`;
   }
 }
@@ -203,6 +206,10 @@ function startPolling() {
   fetchAndRender();
   poll = setInterval(fetchAndRender, 3000);
 }
+function pausePolling() { clearInterval(poll); }
+function resumePolling() {
+  if (selectedUser && !isTyping && !isSearching) startPolling();
+}
 
 async function fetchAndRender() {
   if (!selectedUser || isTyping || isSearching) return;
@@ -210,21 +217,26 @@ async function fetchAndRender() {
     const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials: 'include' });
     const msgs = res.ok ? await res.json() : [];
     const box = document.getElementById("chatMessages");
-    box.innerHTML = msgs.map(m => {
-      const msgClass = m.sender.username === username ? "sent" : "received";
-      const contactExists = contacts.some(c => c.username === m.sender.username);
-      if (!contactExists && m.sender.username !== username) {
-        contacts.push({ username: m.sender.username });
-        renderContacts();
-      }
-      return `<div class="message ${msgClass}">
+    box.innerHTML = msgs.map(m => `
+      <div class="message ${m.sender.username === username ? "sent" : "received"}">
         ${m.text}
         <div class="meta text-end text-muted" style="font-size: 0.75rem;">
           ${new Date(m.createdAt).toLocaleTimeString()}
         </div>
-      </div>`;
-    }).join("");
+      </div>`).join("");
     box.scrollTop = box.scrollHeight;
+
+    // ✅ Add unknown user only if THEY send message
+    msgs.forEach(m => {
+      if (m.sender.username !== username) {
+        const exists = contacts.some(c => c.username === m.sender.username);
+        if (!exists) {
+          contacts.push({ username: m.sender.username });
+          renderContacts();
+        }
+      }
+    });
+
   } catch (err) {
     console.error("Fetch error:", err);
   }
@@ -259,8 +271,8 @@ inp.addEventListener("keydown", e => {
     sendMessage();
   }
 });
-inp.addEventListener("focus", () => { isTyping = true; clearInterval(poll); });
-inp.addEventListener("blur", () => { isTyping = false; startPolling(); });
+inp.addEventListener("focus", () => { isTyping = true; pausePolling(); });
+inp.addEventListener("blur", () => { isTyping = false; resumePolling(); });
 inp.addEventListener("input", () => {
   if (!inp.value.trim()) {
     isTyping = false;
