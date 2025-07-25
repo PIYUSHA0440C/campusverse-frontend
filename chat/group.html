@@ -37,12 +37,10 @@
     .sender {
       font-size:0.85rem;
       font-weight:bold;
-      color:#facc15;      /* default: yellow */
+      color:#facc15;
       margin-bottom:0.25rem;
     }
-    .you .sender {
-      color:#000;         /* your own name in black for readability */
-    }
+    .you .sender { color:#000; }
 
     .meta {
       font-size:0.75rem;
@@ -97,91 +95,102 @@
   </div>
 
   <script>
-    const API = 'https://campusverse-backend.onrender.com/api'
-    const navArea = document.getElementById('nav-user-area')
-    const chatContainer = document.getElementById('chatContainer')
-    const groupNameEl = document.getElementById('groupName')
-    const chatBox = document.getElementById('chatBox')
-    const chatForm = document.getElementById('chatForm')
-    const chatInput = document.getElementById('chatInput')
+    const API = 'https://campusverse-backend.onrender.com/api';
+    const navArea = document.getElementById('nav-user-area');
+    const chatContainer = document.getElementById('chatContainer');
+    const groupNameEl = document.getElementById('groupName');
+    const chatBox = document.getElementById('chatBox');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
 
-    let username, college, isTyping=false, poll
+    let username, college, isTyping = false, poll;
 
     async function init() {
       try {
-        const res = await fetch(`${API}/auth/user`, { credentials:'include' })
-        if (!res.ok) throw new Error('Not authenticated')
-        const user = await res.json()
-        username = user.username
-        college = user.college
+        const res = await fetch(`${API}/auth/user`, { credentials:'include' });
+        if (!res.ok) throw new Error('Not authenticated');
+        const user = await res.json();
+        username = user.username;
+        college = user.college;
 
         navArea.innerHTML = `
           <li class="nav-item"><a class="nav-link" href="profile.html">👤 ${username}</a></li>
           <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>
-        `
-        groupNameEl.textContent = `${college} Group Chat`
-        chatContainer.style.display = 'flex'
-        startPolling()
+        `;
+        groupNameEl.textContent = `${college} Group Chat`;
+        chatContainer.style.display = 'flex';
+        startPolling();
       } catch (e) {
-        console.error('INIT error:', e)
-        window.location.href='login.html'
+        console.error('INIT error:', e);
+        window.location.href = 'login.html';
       }
     }
 
     function logout() {
       fetch(`${API}/auth/logout`, { credentials:'include' })
-        .then(()=> window.location.href='login.html')
+        .then(() => window.location.href = 'login.html');
     }
 
     async function fetchAndRender() {
-      if (isTyping) return
+      if (isTyping) return;
       try {
-        const res = await fetch(`${API}/chat/group`, { credentials:'include' })
-        if (!res.ok) throw new Error('Group fetch failed')
-        const msgs = await res.json()
+        const res = await fetch(`${API}/chat/group`, { credentials:'include' });
+        if (!res.ok) throw new Error('Group fetch failed');
+        const msgs = await res.json();
 
+        // Determine if user is at bottom before updating
+        const atBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 5;
+
+        // Render messages
         chatBox.innerHTML = msgs.map(m => {
-          const cls = m.sender.username===username ? 'you' : 'other'
+          const cls = m.sender.username === username ? 'you' : 'other';
           return `
             <div class="message ${cls}">
               <div class="sender">${m.sender.username}</div>
               ${m.text}
               <div class="meta">${new Date(m.createdAt).toLocaleTimeString()}</div>
-            </div>`
-        }).join('')
-        chatBox.scrollTop = chatBox.scrollHeight
+            </div>`;
+        }).join('');
+
+        // If at bottom before update, scroll to bottom
+        if (atBottom) {
+          chatBox.scrollTop = chatBox.scrollHeight;
+        }
       } catch (e) {
-        console.error('FETCH error:', e)
+        console.error('FETCH error:', e);
       }
     }
 
-    chatForm.addEventListener('submit', async e=>{
-      e.preventDefault()
-      const txt = chatInput.value.trim()
-      if (!txt) return
+    chatForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const txt = chatInput.value.trim();
+      if (!txt) return;
       await fetch(`${API}/chat/group`, {
-        method:'POST',
-        credentials:'include',
-        headers:{'Content-Type':'application/json'},
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: txt })
-      })
-      chatInput.value=''
-      isTyping=false
-      fetchAndRender()
-    })
+      });
+      chatInput.value = '';
+      isTyping = false;
+      fetchAndRender();
+    });
 
-    chatInput.addEventListener('focus', ()=>isTyping=true)
-    chatInput.addEventListener('blur', ()=>{isTyping=false;fetchAndRender()})
-    chatInput.addEventListener('input', ()=>{
-      if(!chatInput.value.trim()){ isTyping=false; fetchAndRender()}
-    })
+    chatInput.addEventListener('focus', () => isTyping = true);
+    chatInput.addEventListener('blur', () => { isTyping = false; fetchAndRender(); });
+    chatInput.addEventListener('input', () => {
+      if (!chatInput.value.trim()) {
+        isTyping = false;
+        fetchAndRender();
+      }
+    });
 
-    function startPolling(){
-      fetchAndRender()
-      poll = setInterval(fetchAndRender,1000)
+    function startPolling() {
+      fetchAndRender();
+      poll = setInterval(fetchAndRender, 1000);
     }
 
-    window.addEventListener('DOMContentLoaded', init)
+    window.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
