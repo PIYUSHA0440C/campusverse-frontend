@@ -37,10 +37,12 @@
     .sender {
       font-size:0.85rem;
       font-weight:bold;
-      color:#facc15;
+      color:#facc15;      /* other users: yellow */
       margin-bottom:0.25rem;
     }
-    .you .sender { color:#000; }
+    .you .sender {
+      color:#fff;         /* your own name: white */
+    }
 
     .meta {
       font-size:0.75rem;
@@ -48,6 +50,18 @@
       text-align:right;
       margin-top:0.5rem;
     }
+
+    .new-indicator {
+      text-align: center;
+      margin: 0.5rem 0;
+      padding: 0.25rem 0.5rem;
+      background: #facc15;
+      color: #000;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
     .chat-footer {
       display:flex;
       gap:0.5rem;
@@ -104,6 +118,7 @@
     const chatInput = document.getElementById('chatInput');
 
     let username, college, isTyping = false, poll;
+    let prevLen = 0;
 
     async function init() {
       try {
@@ -138,23 +153,29 @@
         if (!res.ok) throw new Error('Group fetch failed');
         const msgs = await res.json();
 
-        // Determine if user is at bottom before updating
+        // Detect if user is at bottom
         const atBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 5;
 
-        // Render messages
-        chatBox.innerHTML = msgs.map(m => {
+        // Build HTML with "New messages" indicator if scrolled up
+        let html = '';
+        const newCount = msgs.length - prevLen;
+        msgs.forEach((m, i) => {
+          if (!atBottom && newCount > 0 && i === prevLen) {
+            html += `<div class="new-indicator">New messages below</div>`;
+          }
           const cls = m.sender.username === username ? 'you' : 'other';
-          return `
+          html += `
             <div class="message ${cls}">
               <div class="sender">${m.sender.username}</div>
               ${m.text}
               <div class="meta">${new Date(m.createdAt).toLocaleTimeString()}</div>
             </div>`;
-        }).join('');
+        });
+        chatBox.innerHTML = html;
 
-        // If at bottom before update, scroll to bottom
         if (atBottom) {
           chatBox.scrollTop = chatBox.scrollHeight;
+          prevLen = msgs.length;
         }
       } catch (e) {
         console.error('FETCH error:', e);
@@ -179,10 +200,7 @@
     chatInput.addEventListener('focus', () => isTyping = true);
     chatInput.addEventListener('blur', () => { isTyping = false; fetchAndRender(); });
     chatInput.addEventListener('input', () => {
-      if (!chatInput.value.trim()) {
-        isTyping = false;
-        fetchAndRender();
-      }
+      if (!chatInput.value.trim()) { isTyping = false; fetchAndRender(); }
     });
 
     function startPolling() {
