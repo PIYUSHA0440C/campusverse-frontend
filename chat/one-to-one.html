@@ -82,7 +82,9 @@ async function init() {
       <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>`;
     document.getElementById("chatContainer").style.display = "flex";
     await loadContacts();
-  } catch { window.location.href = "../login.html"; }
+  } catch {
+    window.location.href = "../login.html";
+  }
 }
 
 function logout() {
@@ -94,13 +96,17 @@ async function loadContacts() {
   try {
     const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials: 'include' });
     contacts = res.ok ? await res.json() : [];
-  } catch { contacts = []; }
+  } catch {
+    contacts = [];
+  }
   renderContacts();
 }
 
 function renderContacts() {
   const list = document.getElementById("contactList");
-  list.innerHTML = contacts.length ? "" : `<p class="text-muted text-center mt-3">No contacts yet. Search above to add!</p>`;
+  list.innerHTML = contacts.length
+    ? ""
+    : `<p class="text-muted text-center mt-3">No contacts yet. Search above to add!</p>`;
   contacts.forEach(c => {
     const div = document.createElement("div");
     div.className = "user-item" + (c.username === selectedUser ? " active" : "");
@@ -150,29 +156,27 @@ async function suggestUsers() {
   try {
     const res = await fetch(`${API}/users?search=${encodeURIComponent(query)}`, { credentials: 'include' });
     const users = res.ok ? await res.json() : [];
-    const filtered = users.filter(u => u.username !== username && !contacts.some(c => c.username === u.username)).slice(0, 5);
+    const filtered = users
+      .filter(u => u.username !== username && !contacts.some(c => c.username === u.username))
+      .slice(0, 5);
     if (filtered.length === 0) return suggestionList.innerHTML = `<li class="text-muted">No matches found</li>`;
     filtered.forEach(u => {
       const li = document.createElement("li");
       li.textContent = u.username;
       li.onclick = async () => {
         pausePolling();
-        const res = await fetch(`${API}/chat/one-to-one/contacts`, {
+        const addRes = await fetch(`${API}/chat/one-to-one/contacts`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contact: u.username })
         });
-        if (res.ok) {
-          if (!contacts.some(c => c.username === u.username)) {
-            contacts.push({ username: u.username });
-            renderContacts();
-          }
-          selectUser(u.username);
-          searchInput.value = "";
-          suggestionList.style.display = 'none';
-        } else {
-          alert("Failed to add contact.");
+        if (addRes.ok && !contacts.some(c => c.username === u.username)) {
+          contacts.push({ username: u.username });
+          renderContacts();
         }
+        selectUser(u.username);
+        searchInput.value = "";
+        suggestionList.style.display = 'none';
         resumePolling();
       };
       suggestionList.appendChild(li);
@@ -212,6 +216,16 @@ async function fetchAndRender() {
   try {
     const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials: 'include' });
     const msgs = res.ok ? await res.json() : [];
+
+    // **Automatically add any new sender into contacts**
+    msgs.forEach(m => {
+      const other = m.sender.username;
+      if (other !== username && !contacts.some(c => c.username === other)) {
+        contacts.push({ username: other });
+        renderContacts();
+      }
+    });
+
     const box = document.getElementById("chatMessages");
     box.innerHTML = msgs.map(m => `
       <div class="message ${m.sender.username === username ? "sent" : "received"}">
