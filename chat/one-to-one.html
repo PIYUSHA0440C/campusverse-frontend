@@ -89,7 +89,7 @@ async function init() {
 
 function logout() {
   fetch(`${API}/auth/logout`, { credentials: 'include' })
-    .then(() => window.location.href = "../login.html");
+    .then(() => window.location.href = "../login.html`);
 }
 
 async function loadContacts() {
@@ -214,12 +214,20 @@ function resumePolling() {
 async function fetchAndRender() {
   if (!selectedUser || isTyping || isSearching) return;
 
-  // ← NEW: refresh contact list each poll so newcomers get added immediately
-  await loadContacts();
-
   try {
     const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials: 'include' });
     const msgs = res.ok ? await res.json() : [];
+
+    // <-- ONLY add when they sent you a message
+    msgs.forEach(m => {
+      const other = m.sender.username;
+      if (other !== username && !contacts.some(c => c.username === other) && m.sender.username) {
+        // ensure this message came from them (and not your POST)
+        contacts.push({ username: other });
+        renderContacts();
+      }
+    });
+
     const box = document.getElementById("chatMessages");
     box.innerHTML = msgs.map(m => `
       <div class="message ${m.sender.username === username ? "sent" : "received"}">
