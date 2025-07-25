@@ -81,9 +81,9 @@ async function init() {
   if (!res.ok) return location.href="../login.html";
   const user = await res.json();
   username = user.username;
-  document.getElementById("nav-user-area").innerHTML = `
+  document.getElementById("nav-user-area").innerHTML = 
     <li class="nav-item"><a class="nav-link" href="../profile.html">👤 ${username}</a></li>
-    <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>`;
+    <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>;
   document.getElementById("chatContainer").style.display="flex";
   await loadContacts();
   startPolling();
@@ -122,7 +122,7 @@ const suggestionList = document.getElementById("suggestions");
 searchInput.addEventListener("input",()=>{
   clearTimeout(poll);
   isSearching = true;
-  setTimeout(async()=>{
+  setTimeout(async ()=>{
     await suggestUsers();
     isSearching = false;
   },300);
@@ -176,7 +176,7 @@ async function suggestUsers(){
 /* ─────────── Polling (contacts + messages) ─────────── */
 
 function startPolling(){
-  const tick = async()=>{
+  const tick = async ()=>{
     if(!isTyping && !isSearching){
       await loadContacts();
       if(selectedUser) await fetchAndRender();
@@ -201,11 +201,11 @@ async function fetchAndRender(){
   const msgs=res.ok?await res.json():[];
   const box=document.getElementById("chatMessages");
   box.innerHTML=msgs.map(m=>
-    `<div class="message ${m.sender.username===username?"sent":"received"}">${m.text}
+    <div class="message ${m.sender.username===username?"sent":"received"}">${m.text}
       <div class="text-end text-muted" style="font-size:0.75rem;">
         ${new Date(m.createdAt).toLocaleTimeString()}
       </div>
-    </div>`).join("");
+    </div>).join("");
   box.scrollTop=box.scrollHeight;
 }
 
