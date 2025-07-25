@@ -16,9 +16,10 @@
     .suggestions li { padding: 0.4rem 0.6rem; cursor: pointer; color: #f8fafc; border-bottom: 1px solid #334155; }
     .suggestions li:last-child { border-bottom: none; }
     .suggestions li:hover, .suggestions li.active { background: #475569; }
-    .user-item { padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; cursor: pointer; }
+    .user-item { padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
     .user-item.active { background: #475569; }
     .user-item:hover { background: #334155; }
+    .new-indicator { color: #3b82f6; font-size: 1.2rem; margin-left: 5px; }
     .chat-main { flex: 1; display: flex; flex-direction: column; background: #111827; }
     .chat-header { padding: 0.75rem 1rem; background: #1e293b; border-bottom: 1px solid #334155; font-weight: bold; font-size: 1.1rem; }
     .message-box { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; }
@@ -68,7 +69,7 @@
 <script>
 const API = "https://campusverse-backend.onrender.com/api";
 let username, contacts = [], selectedUser = null;
-let highlightedIndex = -1, poll;
+let highlightedIndex = -1, poll, unseen = {};
 
 async function init() {
   const res = await fetch(`${API}/auth/user`, { credentials: 'include' });
@@ -95,127 +96,138 @@ async function loadContacts() {
 
 function renderContacts() {
   const list = document.getElementById("contactList");
-  list.innerHTML = contacts.length ? "" : `<p class="text-muted text-center mt-3">No contacts yet.</p>`;
+  list.innerHTML = contacts.length
+    ? ""
+    : `<p class="text-muted text-center mt-3">No contacts yet.</p>`;
   contacts.forEach(c => {
     const div = document.createElement("div");
     div.className = "user-item" + (c.username === selectedUser ? " active" : "");
     div.textContent = c.username;
+    if (unseen[c.username]) {
+      const indicator = document.createElement("span");
+      indicator.className = "new-indicator";
+      indicator.innerHTML = "🔵";
+      div.appendChild(indicator);
+    }
     div.onclick = () => selectUser(c.username);
     list.appendChild(div);
   });
 }
 
 document.getElementById("userSearch").addEventListener("input", () => {
-  const val = document.getElementById("userSearch").value.trim();
+  clearTimeout(highlightedIndex);
+  const val = userSearch.value.trim();
   if (!val) return document.getElementById("suggestions").style.display = "none";
-  fetch(`${API}/users?search=${val}`, { credentials: 'include' })
-    .then(res => res.json())
+  fetch(`${API}/users?search=${encodeURIComponent(val)}`, { credentials: 'include' })
+    .then(r => r.json())
     .then(data => {
-      const filtered = data.filter(u => u.username !== username && !contacts.some(c => c.username === u.username)).slice(0, 5);
-      const sug = document.getElementById("suggestions");
+      const filtered = data
+        .filter(u => u.username !== username && !contacts.some(c => c.username === u.username))
+        .slice(0,5);
+      const sug = suggestions;
       sug.innerHTML = "";
-      if (filtered.length === 0) {
+      if (!filtered.length) {
         sug.innerHTML = "<li class='text-muted'>No matches found</li>";
       } else {
-        filtered.forEach((u, i) => {
-          const li = document.createElement("li");
-          li.textContent = u.username;
-          li.onclick = () => {
-            if (!contacts.some(c => c.username === u.username)) {
-              contacts.push({ username: u.username });
-              renderContacts();
+        filtered.forEach((u,i)=>{
+          const li=document.createElement("li");
+          li.textContent=u.username;
+          li.onclick=()=>{ 
+            if(!contacts.find(c=>c.username===u.username)){
+              contacts.push({username:u.username});
             }
             selectUser(u.username);
-            document.getElementById("userSearch").value = "";
-            sug.style.display = "none";
+            userSearch.value="";
+            sug.style.display="none";
           };
           sug.appendChild(li);
         });
       }
-      sug.style.display = "block";
-      highlightedIndex = -1;
+      sug.style.display="block";
+      highlightedIndex=-1;
     });
 });
 
-document.getElementById("userSearch").addEventListener("keydown", (e) => {
-  const items = Array.from(document.querySelectorAll("#suggestions li"));
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    highlightedIndex = (highlightedIndex + 1) % items.length;
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    highlightedIndex = (highlightedIndex - 1 + items.length) % items.length;
-  } else if (e.key === "Enter" && highlightedIndex >= 0) {
+userSearch.addEventListener("keydown",e=>{
+  const items=[...suggestions.children];
+  if(e.key==="ArrowDown"){e.preventDefault(); highlightedIndex=(highlightedIndex+1)%items.length;}
+  else if(e.key==="ArrowUp"){e.preventDefault(); highlightedIndex=(highlightedIndex-1+items.length)%items.length;}
+  else if(e.key==="Enter"&&highlightedIndex>=0){
     e.preventDefault();
     items[highlightedIndex].click();
   }
-  items.forEach((li, i) => li.classList.toggle("active", i === highlightedIndex));
+  items.forEach((li,i)=>li.classList.toggle("active",i===highlightedIndex));
 });
 
-document.addEventListener("click", (e) => {
-  if (!document.querySelector('.search-box').contains(e.target)) {
-    document.getElementById("suggestions").style.display = "none";
+document.addEventListener("click",e=>{
+  if(!document.querySelector('.search-box').contains(e.target)){
+    suggestions.style.display="none";
   }
 });
 
-function selectUser(name) {
-  selectedUser = name;
-  document.getElementById("chatHeader").textContent = `Chatting with: ${name}`;
+function selectUser(name){
+  selectedUser=name;
+  unseen[name]=false;
+  document.getElementById("chatHeader").textContent=`Chatting with: ${name}`;
   renderContacts();
-  document.getElementById("chatMessages").innerHTML = `<p class="text-center text-muted">Loading messages...</p>`;
+  chatMessages.innerHTML=`<p class="text-center text-muted">Loading messages...</p>`;
   clearInterval(poll);
   fetchAndRender();
-  poll = setInterval(fetchAndRender, 3000);
+  poll=setInterval(fetchAndRender,3000);
 }
 
-// ✅ Updated function to immediately show new users in contact panel
-async function fetchAndRender() {
-  if (!selectedUser) return;
-  const res = await fetch(`${API}/chat/one-to-one/${selectedUser}`, { credentials: 'include' });
-  const messages = res.ok ? await res.json() : [];
-  const box = document.getElementById("chatMessages");
-  box.innerHTML = messages.map(m => `
-    <div class="message ${m.sender.username === username ? "sent" : "received"}">${m.text}
-      <div class="text-end text-muted" style="font-size: 0.75rem;">${new Date(m.createdAt).toLocaleTimeString()}</div>
-    </div>`).join("");
-  box.scrollTop = box.scrollHeight;
+async function fetchAndRender(){
+  if(!selectedUser)return;
+  const res=await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`,{credentials:'include'});
+  const msgs=res.ok?await res.json():[];
+  chatMessages.innerHTML=msgs.map(m=>`
+    <div class="message ${m.sender.username===username?"sent":"received"}">
+      ${m.text}
+      <div class="text-end text-muted" style="font-size:0.75rem;">
+        ${new Date(m.createdAt).toLocaleTimeString()}
+      </div>
+    </div>
+  `).join("");
+  chatMessages.scrollTop=chatMessages.scrollHeight;
 
-  let changed = false;
-  messages.forEach(m => {
-    const otherUser = m.sender.username === username ? m.receiver.username : m.sender.username;
-    if (!contacts.some(c => c.username === otherUser)) {
-      contacts.push({ username: otherUser });
-      changed = true;
+  // immediate contact add & unseen marking
+  let updated=false;
+  msgs.forEach(m=>{
+    const other=m.sender.username===username?selectedUser:m.sender.username;
+    if(!contacts.some(c=>c.username===other)){
+      contacts.push({username:other});
+      unseen[other]=true;
+      updated=true;
+    } else if(other!==selectedUser){
+      unseen[other]=true;
+      updated=true;
     }
   });
-  if (changed) renderContacts();
+  if(updated)renderContacts();
 }
 
-async function sendMessage() {
-  const input = document.getElementById("chatInput");
-  const text = input.value.trim();
-  if (!text || !selectedUser) return;
-  const res = await fetch(`${API}/chat/one-to-one/${selectedUser}`, {
-    method: "POST", credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text })
+async function sendMessage(){
+  const text=chatInput.value.trim();
+  if(!text||!selectedUser)return;
+  const res=await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, {
+    method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text})
   });
-  if (res.ok) {
-    if (!contacts.some(c => c.username === selectedUser)) {
-      contacts.push({ username: selectedUser });
-      renderContacts();
+  if(res.ok){
+    if(!contacts.find(c=>c.username===selectedUser)){
+      contacts.push({username:selectedUser});
     }
-    input.value = "";
+    unseen[selectedUser]=false;
+    chatInput.value="";
     fetchAndRender();
   }
 }
 
-document.getElementById("sendBtn").addEventListener("click", sendMessage);
-document.getElementById("chatInput").addEventListener("keydown", e => {
-  if (e.key === "Enter") sendMessage();
-});
+sendBtn.addEventListener("click",sendMessage);
+chatInput.addEventListener("keydown",e=>{if(e.key==="Enter")sendMessage();});
 
-window.addEventListener("DOMContentLoaded", init);
+window.addEventListener("DOMContentLoaded",init);
 </script>
 </body>
 </html>
