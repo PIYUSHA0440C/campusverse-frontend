@@ -52,6 +52,19 @@
       background-color: #4ade80;
       color: #0f172a;
     }
+    .debug-log {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      max-height: 150px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.8);
+      color: #0f0;
+      font-family: monospace;
+      font-size: 12px;
+      z-index: 9999;
+    }
   </style>
 </head>
 <body>
@@ -107,61 +120,87 @@
     </div>
   </div>
 
+  <!-- Debug log panel -->
+  <div class="debug-log" id="debugLog"></div>
+
   <script>
+    // Debug helper
+    function dbg(msg) {
+      console.log(msg);
+      const el = document.getElementById('debugLog');
+      el.innerText += msg + '\n';
+    }
+    window.onerror = (msg, url, line) => dbg(`ERROR: ${msg} at ${url}:${line}`);
+
+    dbg('📖 Starting Book-Exchange page');
+
     const API_BASE = 'https://campusverse-backend.onrender.com/api';
+    dbg(`API_BASE = ${API_BASE}`);
 
     // Check auth & populate navbar
     async function updateNavbar() {
+      dbg('updateNavbar()');
       try {
         const res = await fetch(`${API_BASE}/auth/user`, { credentials: 'include' });
+        dbg(`  auth/user status: ${res.status}`);
         if (!res.ok) throw new Error('Not authenticated');
         const { username } = await res.json();
+        dbg(`  logged in as: ${username}`);
         document.getElementById('nav-user-area').innerHTML = `
           <li class="nav-item"><a class="nav-link" href="../profile.html">👤 ${username}</a></li>
           <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>
         `;
         return username;
-      } catch {
+      } catch (e) {
+        dbg(`  updateNavbar error: ${e.message}`);
         window.location.href = '../login.html';
       }
     }
 
     async function logout() {
+      dbg('logout()');
       await fetch(`${API_BASE}/auth/logout`, { credentials: 'include' });
       window.location.href = '../login.html';
     }
 
     // Load feed
     async function loadFeed() {
+      dbg('loadFeed()');
       try {
         const res = await fetch(`${API_BASE}/books`, { credentials: 'include' });
-        if (!res.ok) throw new Error(`Load feed failed: ${res.status}`);
+        dbg(`  /books status: ${res.status}`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
         const books = await res.json();
-        document.getElementById('bookFeed').innerHTML = books.map(b => {
-          let action = '';
-          if (b.type === 'borrow' && !b.accepted) {
-            action = `<button class="btn btn-sm btn-outline-success mt-2" onclick="acceptRequest('${b._id}')">Accept Request</button>`;
-          } else if (b.accepted) {
-            action = `<div class="accepted-tag mt-2">✅ Accepted by ${b.acceptedBy.username}</div>`;
-          }
-          return `
-            <div class="book-box">
-              <h6>${b.title}
-                <span class="badge bg-${b.type === 'lend' ? 'success' : 'info'} badge-type">${b.type.toUpperCase()}</span>
-              </h6>
-              <p>${b.description || b.reason || ''}</p>
-              <small>By: <strong>${b.user.username}</strong></small>
-              ${action}
-            </div>
-          `;
-        }).join('');
-      } catch (err) {
-        console.error(err);
+        dbg(`  fetched ${books.length} books`);
+        const feed = document.getElementById('bookFeed');
+        feed.innerHTML = books.length
+          ? books.map(b => {
+              let action = '';
+              if (b.type === 'borrow' && !b.accepted) {
+                action = `<button class="btn btn-sm btn-outline-success mt-2" onclick="acceptRequest('${b._id}')">Accept Request</button>`;
+              } else if (b.accepted) {
+                action = `<div class="accepted-tag mt-2">✅ Accepted by ${b.acceptedBy.username}</div>`;
+              }
+              return `
+                <div class="book-box">
+                  <h6>${b.title}
+                    <span class="badge bg-${b.type === 'lend' ? 'success' : 'info'} badge-type">${b.type.toUpperCase()}</span>
+                  </h6>
+                  <p>${b.description || b.reason || ''}</p>
+                  <small>By: <strong>${b.user.username}</strong></small>
+                  ${action}
+                </div>
+              `;
+            }).join('')
+          : '<p class="text-center">No books to show</p>';
+      } catch (e) {
+        dbg(`  loadFeed error: ${e.message}`);
       }
     }
 
     // Post lend
     document.getElementById('lendForm').addEventListener('submit', async e => {
+      dbg('lendForm.submit');
       e.preventDefault();
       const data = {
         title: document.getElementById('lendTitle').value.trim(),
@@ -169,45 +208,53 @@
         description: document.getElementById('lendDescription').value.trim(),
         type: 'lend'
       };
-      await fetch(`${API_BASE}/books/lend`, {
+      dbg(`  sending lend: ${JSON.stringify(data)}`);
+      const res = await fetch(`${API_BASE}/books/lend`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
+      dbg(`  lend response status: ${res.status}`);
       e.target.reset();
       loadFeed();
     });
 
     // Post borrow
     document.getElementById('borrowForm').addEventListener('submit', async e => {
+      dbg('borrowForm.submit');
       e.preventDefault();
       const data = {
         title: document.getElementById('borrowTitle').value.trim(),
         reason: document.getElementById('borrowReason').value.trim(),
         type: 'borrow'
       };
-      await fetch(`${API_BASE}/books/borrow`, {
+      dbg(`  sending borrow: ${JSON.stringify(data)}`);
+      const res = await fetch(`${API_BASE}/books/borrow`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
+      dbg(`  borrow response status: ${res.status}`);
       e.target.reset();
       loadFeed();
     });
 
     // Accept borrow
     async function acceptRequest(id) {
-      await fetch(`${API_BASE}/books/accept/${id}`, {
+      dbg(`acceptRequest(${id})`);
+      const res = await fetch(`${API_BASE}/books/accept/${id}`, {
         method: 'PATCH',
         credentials: 'include'
       });
+      dbg(`  accept response status: ${res.status}`);
       loadFeed();
     }
 
     // Init
     window.addEventListener('DOMContentLoaded', async () => {
+      dbg('DOMContentLoaded');
       await updateNavbar();
       loadFeed();
     });
