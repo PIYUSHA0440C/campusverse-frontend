@@ -108,16 +108,13 @@
   </div>
 
   <script>
-    // Dynamically pick your API base
-    const API_BASE = window.location.hostname === 'localhost'
-      ? 'http://localhost:5000/api'
-      : 'https://campusverse-backend.onrender.com/api';
+    const API_BASE = 'https://campusverse-backend.onrender.com/api';
 
     // Check auth & populate navbar
     async function updateNavbar() {
       try {
-        const res = await fetch(`${API_BASE}/auth/user`, { credentials:'include' });
-        if (!res.ok) throw new Error();
+        const res = await fetch(`${API_BASE}/auth/user`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Not authenticated');
         const { username } = await res.json();
         document.getElementById('nav-user-area').innerHTML = `
           <li class="nav-item"><a class="nav-link" href="../profile.html">👤 ${username}</a></li>
@@ -130,17 +127,16 @@
     }
 
     async function logout() {
-      await fetch(`${API_BASE}/auth/logout`, { credentials:'include' });
+      await fetch(`${API_BASE}/auth/logout`, { credentials: 'include' });
       window.location.href = '../login.html';
     }
 
-    // Load feed with error logging
+    // Load feed
     async function loadFeed() {
       try {
-        const res = await fetch(`${API_BASE}/books`, { credentials:'include' });
-        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const res = await fetch(`${API_BASE}/books`, { credentials: 'include' });
+        if (!res.ok) throw new Error(`Load feed failed: ${res.status}`);
         const books = await res.json();
-        console.log('Fetched books:', books);
         document.getElementById('bookFeed').innerHTML = books.map(b => {
           let action = '';
           if (b.type === 'borrow' && !b.accepted) {
@@ -151,16 +147,16 @@
           return `
             <div class="book-box">
               <h6>${b.title}
-                <span class="badge bg-${b.type==='lend'?'success':'info'} badge-type">${b.type.toUpperCase()}</span>
+                <span class="badge bg-${b.type === 'lend' ? 'success' : 'info'} badge-type">${b.type.toUpperCase()}</span>
               </h6>
-              <p>${b.description||b.reason||''}</p>
+              <p>${b.description || b.reason || ''}</p>
               <small>By: <strong>${b.user.username}</strong></small>
               ${action}
             </div>
           `;
         }).join('');
       } catch (err) {
-        console.error('loadFeed error:', err);
+        console.error(err);
       }
     }
 
@@ -174,11 +170,13 @@
         type: 'lend'
       };
       await fetch(`${API_BASE}/books/lend`, {
-        method:'POST', credentials:'include',
-        headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
       });
       e.target.reset();
-      await loadFeed();
+      loadFeed();
     });
 
     // Post borrow
@@ -187,28 +185,31 @@
       const data = {
         title: document.getElementById('borrowTitle').value.trim(),
         reason: document.getElementById('borrowReason').value.trim(),
-        type:'borrow'
+        type: 'borrow'
       };
       await fetch(`${API_BASE}/books/borrow`, {
-        method:'POST', credentials:'include',
-        headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
       });
       e.target.reset();
-      await loadFeed();
+      loadFeed();
     });
 
     // Accept borrow
     async function acceptRequest(id) {
       await fetch(`${API_BASE}/books/accept/${id}`, {
-        method:'PATCH', credentials:'include'
+        method: 'PATCH',
+        credentials: 'include'
       });
-      await loadFeed();
+      loadFeed();
     }
 
     // Init
     window.addEventListener('DOMContentLoaded', async () => {
       await updateNavbar();
-      await loadFeed();
+      loadFeed();
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
