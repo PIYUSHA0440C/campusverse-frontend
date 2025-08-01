@@ -356,7 +356,6 @@ const searchInput = document.getElementById("userSearch");
 const suggestionList = document.getElementById("suggestions");
 
 searchInput.addEventListener("input",()=>{
-  // continue polling even while searching
   setTimeout(async ()=>{
     await suggestUsers();
   },300);
