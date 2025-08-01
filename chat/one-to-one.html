@@ -311,6 +311,7 @@ window.addEventListener("DOMContentLoaded",init);
 const API = "https://campusverse-backend.onrender.com/api";
 let username, contacts = [], selectedUser = null;
 let highlightedIndex = -1, poll;
+let searchTimeout;
 
 async function init() {
   const res = await fetch(`${API}/auth/user`, { credentials:'include' });
@@ -320,145 +321,141 @@ async function init() {
   document.getElementById("nav-user-area").innerHTML = `
     <li class="nav-item"><a class="nav-link" href="../profile.html">👤 ${username}</a></li>
     <li class="nav-item"><a class="nav-link text-danger" href="#" onclick="logout()">Logout</a></li>`;
-  document.getElementById("chatContainer").style.display="flex";
+  document.getElementById("chatContainer").style.display = "flex";
   await loadContacts();
   startPolling();
 }
 
-function logout(){
-  fetch(`${API}/auth/logout`,{credentials:'include'})
-    .then(()=>location.href="../login.html");
+function logout() {
+  fetch(`${API}/auth/logout`, { credentials:'include' })
+    .then(() => location.href = "../login.html");
 }
 
-async function loadContacts(){
-  const res = await fetch(`${API}/chat/one-to-one/contacts`,{credentials:'include'});
-  contacts = res.ok?await res.json():[];
+async function loadContacts() {
+  const res = await fetch(`${API}/chat/one-to-one/contacts`, { credentials:'include' });
+  contacts = res.ok ? await res.json() : [];
   renderContacts();
 }
 
-function renderContacts(){
-  const list=document.getElementById("contactList");
-  list.innerHTML = contacts.length
-    ? ""
-    : `<p class="text-muted text-center mt-3">No contacts yet. Search above to add!</p>`;
-  contacts.forEach(c=>{
-    const div=document.createElement("div");
-    div.className="user-item"+(c.username===selectedUser?" active":"");
-    div.textContent=c.username;
-    div.onclick=()=>selectUser(c.username);
+function renderContacts() {
+  const list = document.getElementById("contactList");
+  list.innerHTML = contacts.length ? "" : `<p class="text-muted text-center mt-3">No contacts yet. Search above to add!</p>`;
+  contacts.forEach(c => {
+    const div = document.createElement("div");
+    div.className = "user-item" + (c.username === selectedUser ? " active" : "");
+    div.textContent = c.username;
+    div.onclick = () => selectUser(c.username);
     list.appendChild(div);
   });
 }
 
 /* ─────────── Search box & arrow keys ─────────── */
-
 const searchInput = document.getElementById("userSearch");
 const suggestionList = document.getElementById("suggestions");
 
-searchInput.addEventListener("input",()=>{
-  setTimeout(async ()=>{
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(async () => {
     await suggestUsers();
-  },300);
+  }, 300);
 });
 
-searchInput.addEventListener("keydown",e=>{
-  const items=Array.from(suggestionList.children);
-  if(e.key==="ArrowDown"||e.key==="ArrowUp"||e.key==="Enter"){
+searchInput.addEventListener("keydown", e => {
+  const items = Array.from(suggestionList.children);
+  if (["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) {
     e.preventDefault();
-    if(e.key==="ArrowDown") highlightedIndex=(highlightedIndex+1)%items.length;
-    if(e.key==="ArrowUp") highlightedIndex=(highlightedIndex-1+items.length)%items.length;
-    if(e.key==="Enter"&&highlightedIndex>=0) items[highlightedIndex].click();
-    items.forEach((li,i)=>li.classList.toggle("active",i===highlightedIndex));
+    if (e.key === "ArrowDown") highlightedIndex = (highlightedIndex + 1) % items.length;
+    if (e.key === "ArrowUp") highlightedIndex = (highlightedIndex - 1 + items.length) % items.length;
+    if (e.key === "Enter" && highlightedIndex >= 0) items[highlightedIndex].click();
+    items.forEach((li, i) => li.classList.toggle("active", i === highlightedIndex));
   }
 });
 
-document.addEventListener("click",e=>{
-  if(!document.querySelector(".search-box").contains(e.target))
-    suggestionList.style.display="none";
+document.addEventListener("click", e => {
+  if (!document.querySelector(".search-box").contains(e.target))
+    suggestionList.style.display = "none";
 });
 
-async function suggestUsers(){
-  const q=searchInput.value.trim();
-  suggestionList.innerHTML="";
-  if(!q) return suggestionList.style.display="none";
-  const res=await fetch(`${API}/users?search=${encodeURIComponent(q)}`,{credentials:'include'});
-  const users=res.ok?await res.json():[];
-  const filtered=users.filter(u=>u.username!==username && !contacts.some(c=>c.username===u.username)).slice(0,5);
-  if(!filtered.length){
-    suggestionList.innerHTML="<li class='text-muted'>No matches found</li>";
+async function suggestUsers() {
+  const q = searchInput.value.trim();
+  suggestionList.innerHTML = "";
+  if (!q) return suggestionList.style.display = "none";
+  const res = await fetch(`${API}/users?search=${encodeURIComponent(q)}`, { credentials:'include' });
+  const users = res.ok ? await res.json() : [];
+  const filtered = users.filter(u => u.username !== username && !contacts.some(c => c.username === u.username)).slice(0, 5);
+  if (!filtered.length) {
+    suggestionList.innerHTML = "<li class='text-muted'>No matches found</li>";
   } else {
-    filtered.forEach(u=>{
-      const li=document.createElement("li");
-      li.textContent=u.username;
-      li.onclick=async()=>{
-        if(!contacts.some(c=>c.username===u.username)){
-          contacts.push({username:u.username});
+    filtered.forEach(u => {
+      const li = document.createElement("li");
+      li.textContent = u.username;
+      li.onclick = async () => {
+        if (!contacts.some(c => c.username === u.username)) {
+          contacts.push({ username: u.username });
           renderContacts();
         }
         selectUser(u.username);
-        searchInput.value="";
-        suggestionList.style.display="none";
+        searchInput.value = "";
+        suggestionList.style.display = "none";
       };
       suggestionList.appendChild(li);
     });
   }
-  suggestionList.style.display="block";
-  highlightedIndex=-1;
+  suggestionList.style.display = "block";
+  highlightedIndex = -1;
 }
 
 /* ─────────── Polling (contacts + messages) ─────────── */
-
-function startPolling(){
-  const tick = async ()=>{
+function startPolling() {
+  const tick = async () => {
     await loadContacts();
-    if(selectedUser) await fetchAndRender();
+    if (selectedUser) await fetchAndRender();
   };
   tick();
-  poll=setInterval(tick,3000);
+  poll = setInterval(tick, 3000);
 }
 
 /* ─────────── Messages ─────────── */
-
-async function selectUser(name){
-  selectedUser=name;
-  document.getElementById("chatHeader").textContent=`Chatting with: ${name}`;
+async function selectUser(name) {
+  selectedUser = name;
+  document.getElementById("chatHeader").textContent = `Chatting with: ${name}`;
   renderContacts();
-  document.getElementById("chatMessages").innerHTML=`<p class="text-center text-muted">Loading messages…</p>`;
+  document.getElementById("chatMessages").innerHTML = `<p class="text-center text-muted">Loading messages…</p>`;
   await fetchAndRender();
 }
 
-async function fetchAndRender(){
-  const res=await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`,{credentials:'include'});
-  const msgs=res.ok?await res.json():[];
-  const box=document.getElementById("chatMessages");
-  box.innerHTML=msgs.map(m=>`
-    <div class="message ${m.sender.username===username?"sent":"received"}">${m.text}
+async function fetchAndRender() {
+  const res = await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, { credentials:'include' });
+  const msgs = res.ok ? await res.json() : [];
+  const box = document.getElementById("chatMessages");
+  box.innerHTML = msgs.map(m => `
+    <div class="message ${m.sender.username === username ? "sent" : "received"}">${m.text}
       <div class="text-end text-muted" style="font-size:0.75rem;">
         ${new Date(m.createdAt).toLocaleTimeString()}
       </div>
     </div>`).join("");
-  box.scrollTop=box.scrollHeight;
+  box.scrollTop = box.scrollHeight;
 }
 
-async function sendMessage(){
-  const input=document.getElementById("chatInput");
-  const txt=input.value.trim();
-  if(!txt||!selectedUser) return;
-  await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`,{
-    method:"POST",credentials:"include",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({text:txt})
+async function sendMessage() {
+  const input = document.getElementById("chatInput");
+  const txt = input.value.trim();
+  if (!txt || !selectedUser) return;
+  await fetch(`${API}/chat/one-to-one/${encodeURIComponent(selectedUser)}`, {
+    method: "POST", credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: txt })
   });
-  input.value="";
+  input.value = "";
   await fetchAndRender();
 }
 
-document.getElementById("sendBtn").addEventListener("click",sendMessage);
-document.getElementById("chatInput").addEventListener("keydown",e=>{
-  if(e.key==="Enter") sendMessage();
+document.getElementById("sendBtn").addEventListener("click", sendMessage);
+document.getElementById("chatInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") sendMessage();
 });
 
-window.addEventListener("DOMContentLoaded",init);
+window.addEventListener("DOMContentLoaded", init);
 </script>
 </body>
 </html>
