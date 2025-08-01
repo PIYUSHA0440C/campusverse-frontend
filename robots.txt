@@ -1,0 +1,3 @@
+User-agent: *
+Disallow:
+Sitemap: https://campusverseplatform.netlify.app/sitemap.xml
